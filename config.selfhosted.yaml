@@ -1,0 +1,134 @@
+# Self-hosted configuration — zero API keys required.
+# Uses: docker-compose.selfhosted.yml
+
+defaults:
+  search_provider: searxng
+  extract_provider: jina
+  timeout: 15
+  retry:
+    strategy: fallback
+    max_attempts: 3
+    fallback_chain:
+      - jina
+      - crawl4ai_md
+      - crawl4ai
+
+policies:
+  - name: simple_docs
+    match:
+      domain_glob:
+        - "*.wikipedia.org"
+        - "*.docs.python.org"
+        - "*.developer.mozilla.org"
+    extract_provider: crawl4ai_md
+
+providers:
+  searxng:
+    base_url: http://searxng:8080
+    enabled: true
+
+  jina:
+    base_url: https://r.jina.ai
+    enabled: true
+
+  crawl4ai:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.5
+    specialization: browser
+    enabled: true
+
+  crawl4ai_md:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.3
+    specialization: markdown
+    enabled: true
+
+  invisible_playwright:
+    base_url: http://invisible-playwright:3001
+    stealth: true
+    engine: firefox
+    firefox_version: "150"
+    cost_units_per_call: 0.8
+    enabled: true
+
+  devdocs:
+    base_url: http://devdocs:9292
+    specialization: docs
+    cost_units_per_call: 0.0
+    enabled: true
+
+auth:
+  keys:
+    - id: key_agent1
+      secret: change-me-in-production
+      label: "Primary agent"
+    - id: key_admin
+      secret: change-me-in-production
+      label: "Admin"
+      admin: true
+
+logging:
+  path: logs/gateway.jsonl
+  max_bytes: 10485760
+  backup_count: 5
+
+cache:
+  enabled: true
+  backend: sqlite
+  db_path: data/cache.db
+  default_ttl: 300
+
+sessions:
+  store_path: sessions
+
+post_processing:
+  default:
+    stage1_extractor: trafilatura
+    stage2_converter: markdownify
+    stage3_clean: true
+    stage4_deduplicate: false
+  cleaning:
+    min_content_length: 200
+    additional_boilerplate_patterns: []
+  deduplication:
+    enabled: false
+    store: sqlite
+  providers:
+    firecrawl:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    jina:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    crawl4ai:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    crawl4ai_md:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+
+circuit_breaker:
+  enabled: true
+  providers:
+    default:
+      error_threshold: 5
+      window_seconds: 60
+      cooldown_seconds: 120
+      trip_on: ["429", "503", "timeout", "bot_detected"]
+
+dlp_policies: []
+
+llm_judge:
+  enabled: false
+
+mcp:
+  enabled: false
+
+prompt_injection:
+  enabled: false

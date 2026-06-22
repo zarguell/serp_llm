@@ -1,0 +1,150 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: webgateway-traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard on subpath
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs:ro
+      - ./dynamic:/dynamic:ro
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--providers.file.filename=/dynamic/tls.yml"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=webgateway-net"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--log.level=INFO"
+      - "--accesslog.enabled=false"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`gateway.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.service=api@internal"
+    networks:
+      - webgateway-net
+
+  webgateway:
+    build: .
+    container_name: webgateway
+    restart: unless-stopped
+    volumes:
+      - ./config.selfhosted.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+      - ./sessions:/app/sessions
+      - ./data:/app/data
+    depends_on:
+      searxng:
+        condition: service_healthy
+      crawl4ai:
+        condition: service_healthy
+    networks:
+      - webgateway-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webgateway.rule=Host(`gateway.localhost`)"
+      - "traefik.http.routers.webgateway.entrypoints=websecure"
+      - "traefik.http.routers.webgateway.tls=true"
+      - "traefik.http.services.webgateway.loadbalancer.server.port=8080"
+    # No ports exposure — only accessible via Traefik
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: webgateway-searxng
+    restart: unless-stopped
+    volumes:
+      - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - webgateway-net
+    # NO traefik labels — internal only
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    container_name: webgateway-crawl4ai
+    restart: unless-stopped
+    shm_size: "1gb"
+    environment:
+      CRAWL4AI_API_TOKEN: ""
+    volumes:
+      - crawl4ai-cache:/home/appuser/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+        reservations:
+          memory: 1g
+    networks:
+      - webgateway-net
+    # NO traefik labels — internal only
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  devdocs:
+    image: ghcr.io/freecodecamp/devdocs:latest-alpine
+    container_name: webgateway-devdocs
+    restart: unless-stopped
+    networks:
+      - webgateway-net
+    # NO traefik labels — internal only
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9292/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  invisible-playwright:
+    image: webgateway/invisible-playwright:latest
+    container_name: webgateway-ipw
+    restart: unless-stopped
+    environment:
+      - MAX_CONCURRENT_SESSIONS=3
+      - SESSION_TIMEOUT=300
+      - FINGERPRINT_ROTATE=true
+    volumes:
+      - ./sessions/invisible-playwright:/app/sessions
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+    networks:
+      - webgateway-net
+    # NO traefik labels — internal only
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  crawl4ai-cache:
+
+networks:
+  webgateway-net:
+    driver: bridge
