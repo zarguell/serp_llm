@@ -15,3 +15,81 @@ Stealth browser based on C++-patched Firefox 150. Undetectable extraction for ha
 ## Zyte
 
 Managed anti-bot extraction service. Handles the hardest targets with automatic CAPTCHA solving and IP rotation.
+
+## Crawl4AI
+
+Self-hosted extraction with full browser rendering (Playwright-based). Runs as a Docker sidecar and registers two separate providers that point at the same container. Extract-only — no search capability.
+
+### Docker Setup
+
+```yaml
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    ports:
+      - "11235:11235"
+    shm_size: 1gb
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 30s
+      retries: 3
+```
+
+Requires `shm_size: 1gb` and at least 4GB RAM limit. The API token is optional — set `CRAWL4AI_API_TOKEN` in the environment and pass it as a `Bearer` token to the Crawl4AI API if you need auth.
+
+### Two Modes
+
+| Provider | Endpoint | Use Case |
+|----------|----------|----------|
+| `crawl4ai` | `POST /crawl` | Full browser rendering, JavaScript execution |
+| `crawl4ai_md` | `POST /md` | Lightweight markdown extraction, cheaper |
+
+### Configuration
+
+```yaml
+providers:
+  crawl4ai:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.5
+    specialization: browser
+  crawl4ai_md:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.3
+    specialization: markdown
+```
+
+### Policy Routing
+
+Use domain-based rules to pick the right mode for each target:
+
+```yaml
+policies:
+  - name: simple_docs_extract
+    match:
+      domain_glob: ["*.wikipedia.org", "*.docs.python.org"]
+    extract_provider: crawl4ai_md
+  - name: js_heavy_extract
+    match:
+      domain_glob: ["*.react-app.com"]
+    extract_provider: crawl4ai
+```
+
+### API Calls
+
+```bash
+# Full browser crawl with JS rendering
+curl -X POST http://localhost:8080/extract \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "provider": "crawl4ai"}'
+
+# Lightweight markdown extraction
+curl -X POST http://localhost:8080/extract \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "provider": "crawl4ai_md"}'
+```
