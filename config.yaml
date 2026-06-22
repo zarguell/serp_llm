@@ -17,8 +17,8 @@ defaults:
     max_attempts: 3
     fallback_chain:
       - jina
+      - crawl4ai_md
       - firecrawl
-      - playwright
 
 # ---------------------------------------------------------------------------
 # Routing Policies — evaluated in order, first match wins
@@ -145,6 +145,21 @@ providers:
     specialization: semantic
     cost_units_per_call: 1.0
     specialization: stealth_primary
+
+  # Self-hosted browser crawler — full JS rendering
+  # Requires: docker compose -f docker-compose.yml up crawl4ai
+  crawl4ai:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.5
+    specialization: browser
+
+  # Self-hosted lightweight markdown extraction (same container as crawl4ai)
+  crawl4ai_md:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    cost_units_per_call: 0.3
+    specialization: markdown
 
 # ---------------------------------------------------------------------------
 # LLM Judge — fires on policy miss or retry to resolve ambiguous routing
@@ -340,6 +355,14 @@ post_processing:
       stage1_extractor: none
       stage2_converter: none
       stage3_clean: true
+    crawl4ai:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    crawl4ai_md:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
 
 # ---------------------------------------------------------------------------
 # Response Cache (PRD §17)
@@ -420,8 +443,22 @@ quotas:
     exhausted_action: fallback_only
 
 alerts:
-  webhook_url: ${ALERT_WEBHOOK_URL}
   events: [quota_alert, circuit_open, quota_exhausted]
+  suppress_seconds: 300
+  webhook:
+    url: ${ALERT_WEBHOOK_URL}
+    headers:
+      Content-Type: application/json
+  smtp:
+    enabled: false
+    host: ${SMTP_HOST}
+    port: 587
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    use_tls: true
+    from_addr: ${SMTP_FROM:-webgateway@localhost}
+    to_addrs: ${SMTP_TO:-[]}
+    subject_prefix: "[WebGateway]"
 
 # ---------------------------------------------------------------------------
 # MCP Server — downstream interface for AI agents

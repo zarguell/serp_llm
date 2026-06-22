@@ -37,6 +37,31 @@ services:
       retries: 12
       start_period: 10s
 
+  # --- Crawl4AI self-hosted crawler ---
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    profiles: ["crawl4ai"]
+    ports:
+      - "11235:11235"
+    shm_size: "1gb"
+    environment:
+      CRAWL4AI_API_TOKEN: ""
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+        reservations:
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: "no"
+    networks:
+      - webgateway-net
+
   # ---- Self-hosted Firecrawl (opt-in via --profile firecrawl-selfhosted) ----
 
   firecrawl:
@@ -122,3 +147,8 @@ services:
 
 volumes:
   cache-data:
+  crawl4ai-cache:
+
+networks:
+  webgateway-net:
+    driver: bridge

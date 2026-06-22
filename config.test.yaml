@@ -66,6 +66,18 @@ providers:
     enabled: true
     specialization: semantic
     cost_units_per_call: 1.0
+  crawl4ai:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    enabled: true
+    specialization: browser
+    cost_units_per_call: 0.5
+  crawl4ai_md:
+    base_url: http://crawl4ai:11235
+    timeout: 30
+    enabled: true
+    specialization: markdown
+    cost_units_per_call: 0.3
 
 auth:
   keys:
@@ -172,6 +184,14 @@ post_processing:
       stage2_converter: none
       stage3_clean: true
     jina:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    crawl4ai:
+      stage1_extractor: none
+      stage2_converter: none
+      stage3_clean: true
+    crawl4ai_md:
       stage1_extractor: none
       stage2_converter: none
       stage3_clean: true
