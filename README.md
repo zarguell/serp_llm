@@ -112,6 +112,16 @@ All provider adapters implement a uniform `ProviderAdapter` protocol — switchi
 
 ---
 
+## Admin UI
+
+WebGateway includes a built-in admin dashboard at `/admin` — provider health monitoring, cache management, usage analytics, key management, session viewer, and live log streaming.
+
+![Admin Dashboard](docs-src/docs/images/admin-dashboard.png)
+
+> See the [Admin UI Guide](docs-src/docs/operations/admin-ui.md) for all pages and features.
+
+---
+
 ## Commands
 
 ```bash

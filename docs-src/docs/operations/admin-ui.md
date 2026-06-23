@@ -10,26 +10,51 @@ The Admin UI is a lightweight, self-contained web interface at `/admin`. It uses
 
 ## Pages
 
+### Login
+
+![Admin Login](../images/admin-login.png)
+
 ### Dashboard
+
 At-a-glance status: provider health grid, request volume sparkline, cache hit rate, active alerts.
 
+![Admin Dashboard](../images/admin-dashboard.png)
+
 ### API Keys
+
 List, create, and revoke API keys. Plaintext secret shown exactly once on creation.
 
+![Admin Keys](../images/admin-keys.png)
+
 ### Providers
+
 Provider health, circuit state, quota usage, and warnings. Manual circuit reset available.
 
+![Admin Providers](../images/admin-providers.png)
+
 ### Sessions
+
 Cookie Bucket management: list, create, invalidate, and refresh sessions.
 
+![Admin Sessions](../images/admin-sessions.png)
+
 ### Usage
+
 Per-provider and per-key usage statistics with selectable time ranges (24h/7d/30d).
 
+![Admin Usage](../images/admin-usage.png)
+
 ### Logs
+
 Live log viewer with auto-refresh (5s polling via HTMX). Filter by key ID, provider, status, and cache hit. Each entry expandable to full JSON.
 
+![Admin Logs](../images/admin-logs.png)
+
 ### Cache
+
 Cache statistics, invalidation by URL/domain/provider, and full flush with confirmation.
+
+![Admin Cache](../images/admin-cache.png)
 
 ## Login Error Messages
 
