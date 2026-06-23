@@ -153,8 +153,13 @@ class JsonLdStrategy:
                 data = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            # Handle @graph (list of blocks)
-            blocks = data if isinstance(data, list) else [data]
+            # Handle @graph (list of blocks) or top-level array
+            if isinstance(data, dict) and "@graph" in data:
+                blocks = data["@graph"]
+            elif isinstance(data, list):
+                blocks = data
+            else:
+                blocks = [data]
             for block in blocks:
                 if isinstance(block, dict) and "@type" in block:
                     scored = _score_block(block)
