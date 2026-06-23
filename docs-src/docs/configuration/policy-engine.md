@@ -36,7 +36,67 @@ policies:
       - crawl4ai
 ```
 
-## Dry Run — Preview Policy Decisions
+## Structured Data Extraction
+
+Policy rules can enable per-domain extraction strategies that enrich extract responses with structured metadata (ratings, prices, genres, dates) alongside the full page content. Strategies run in priority order — the first to produce data wins.
+
+```yaml
+  - name: imdb
+    match:
+      domain_glob: "*.imdb.com"
+    extract_strategy:
+      priority:
+        - json_ld         # Try JSON-LD first
+        - meta_extract     # Then meta tags
+        - article_extract  # Default trafilatura fallback
+```
+
+### How it works
+
+1. Provider returns raw HTML
+2. Strategy selector runs on the HTML, looking for the configured strategies in priority order
+3. If a strategy finds structured data (e.g., JSON-LD with `@type: Movie`), it's returned in the `structured_data` field of the extract response
+4. The full page content still flows through the normal trafilatura pipeline — strategies **supplement**, they never replace content
+
+### Response
+
+Every extract response has a `structured_data` field — always present (null when no strategy matched):
+
+```json
+{
+  "content": "Full page text extracted by trafilatura...",
+  "format": "markdown",
+  "structured_data": {
+    "@type": "Movie",
+    "name": "The Shawshank Redemption",
+    "aggregateRating": {"ratingValue": "9.3", "reviewCount": "2684145"},
+    "duration": "PT2H22M",
+    "genre": ["Drama"],
+    "datePublished": "1994-10-14"
+  }
+}
+```
+
+### Available strategies
+
+| Strategy | Extracts | Best for |
+|---|---|---|
+| `json_ld` | `<script type="application/ld+json">` blocks, scored by `@type` priority | Product, Movie, Recipe, Event, Article pages |
+| `meta_extract` | Open Graph, Twitter Card, and standard `<meta>` tags | News articles, blog posts, any page with OG tags |
+| `article_extract` | Default trafilatura → markdownify | Everything (always the final fallback) |
+
+### Configured domains
+
+These domains have `json_ld` → `meta_extract` → `article_extract` priority configured:
+
+- `*.amazon.com`, `*.amazon.*` — Product JSON-LD
+- `*.imdb.com` — Movie/TV JSON-LD
+- `*.ebay.com` — Product JSON-LD
+- `*.etsy.com` — Product JSON-LD
+- `*.bestbuy.com` — Product JSON-LD
+- `*.walmart.com` — Product JSON-LD
+
+Add more by adding policy rules with `extract_strategy` to your `config.yaml`.
 
 Append `?dry_run=true` to `/search` or `/extract` to see what the policy engine would decide without executing the request. Useful for debugging routing rules and verifying fallback chains.
 
