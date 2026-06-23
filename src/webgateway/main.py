@@ -36,6 +36,7 @@ from webgateway.post_processing.dedup import DedupStore
 from webgateway.post_processing.pipeline import PostProcessingPipeline
 from webgateway.post_processing.strategies import StrategySelector
 from webgateway.post_processing.strategies.json_ld import JsonLdStrategy
+from webgateway.post_processing.strategies.meta_extract import MetaExtractStrategy
 from webgateway.providers.base import ProviderError
 from webgateway.providers.registry import ProviderRegistry
 from webgateway.proxy import ProxyResolver
@@ -140,6 +141,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # --- Extraction strategies ---
     strategy_selector = StrategySelector(config_manager)
     strategy_selector.register("json_ld", JsonLdStrategy())
+    strategy_selector.register("meta_extract", MetaExtractStrategy())
     app.state.strategy_selector = strategy_selector
 
     # --- Post-processing pipeline ---

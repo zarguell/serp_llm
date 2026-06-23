@@ -68,6 +68,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
   - name: imdb
@@ -77,6 +78,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
   - name: ebay
@@ -86,6 +88,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
   - name: etsy
@@ -95,6 +98,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
   - name: bestbuy
@@ -104,6 +108,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
   - name: walmart
@@ -113,6 +118,7 @@ policies:
     extract_strategy:
       priority:
         - json_ld
+        - meta_extract
         - article_extract
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from webgateway.post_processing.strategies.json_ld import JsonLdStrategy
+from webgateway.post_processing.strategies.meta_extract import MetaExtractStrategy
 
 
 @pytest.fixture
@@ -150,3 +151,52 @@ class TestJsonLdStrategy:
         result = await strategy.extract(html, "https://example.com/graph")
         assert result is not None
         assert "Graph Product" in result.content
+
+
+@pytest.fixture
+def meta_strategy() -> MetaExtractStrategy:
+    return MetaExtractStrategy()
+
+
+class TestMetaExtractStrategy:
+    async def test_extract_og_tags(self, meta_strategy: MetaExtractStrategy):
+        html = """
+        <html><head>
+        <title>Test Article</title>
+        <meta property="og:title" content="OG Test Article">
+        <meta property="og:description" content="An OG description">
+        <meta property="og:image" content="https://example.com/image.jpg">
+        <meta name="description" content="A meta description">
+        <meta name="keywords" content="test, article">
+        </head><body><p>Body content</p></body></html>
+        """
+        result = await meta_strategy.extract(html, "https://example.com")
+        assert result is not None
+        assert "OG Test Article" in result.content
+        assert "An OG description" in result.content
+        assert result.structured_data is not None
+        assert result.structured_data["og:title"] == "OG Test Article"
+
+    async def test_twitter_cards(self, meta_strategy: MetaExtractStrategy):
+        html = """
+        <html><head>
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@test">
+        <meta name="twitter:creator" content="@author">
+        </head></html>
+        """
+        result = await meta_strategy.extract(html, "https://example.com")
+        assert result is not None
+        assert "summary_large_image" in result.content
+        assert "@test" in result.content
+
+    async def test_no_meta_returns_none(self, meta_strategy: MetaExtractStrategy):
+        html = "<html><body><p>No meta here</p></body></html>"
+        result = await meta_strategy.extract(html, "https://example.com")
+        assert result is None
+
+    async def test_title_only(self, meta_strategy: MetaExtractStrategy):
+        html = "<html><head><title>Just a title</title></head><body></body></html>"
+        result = await meta_strategy.extract(html, "https://example.com")
+        assert result is not None
+        assert "Just a title" in result.content
