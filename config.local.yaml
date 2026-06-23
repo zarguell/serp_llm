@@ -23,6 +23,51 @@ policies:
         - json_ld
         - article_extract
 
+  - name: imdb
+    match:
+      domain_glob:
+        - "*.imdb.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - article_extract
+
+  - name: ebay
+    match:
+      domain_glob:
+        - "*.ebay.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - article_extract
+
+  - name: etsy
+    match:
+      domain_glob:
+        - "*.etsy.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - article_extract
+
+  - name: bestbuy
+    match:
+      domain_glob:
+        - "*.bestbuy.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - article_extract
+
+  - name: walmart
+    match:
+      domain_glob:
+        - "*.walmart.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - article_extract
+
 providers:
   searxng:
     base_url: http://searxng:8080
