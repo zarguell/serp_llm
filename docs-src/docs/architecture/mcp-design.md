@@ -73,3 +73,14 @@ Available strategies:
 See `src/webgateway/post_processing/strategies/` for implementations and `src/webgateway/post_processing/pipeline.py` for the integration.
 
 See `src/webgateway/mcp/server.py` for the implementation.
+
+## Bot detection auto-routing
+
+When a provider returns a CAPTCHA or bot-detection page (Cloudflare, DataDome, etc.), the gateway automatically reroutes through a bot-solving provider like FlareSolverr or invisible_playwright — no per-domain policy rule required.
+
+Detection is pattern-based (see `BOT_BLOCK_PATTERNS` in `src/webgateway/service.py`). This is best-effort and **will need tuning** based on real-world telemetry. False negatives (blocked pages that slip through) are preferred over false positives (legitimate content misidentified as a bot block).
+
+Future improvements:
+- Per-provider success/failure telemetry to tune detection patterns
+- Adaptive fallback (skip a provider permanently if it consistently returns bot pages for a domain)
+- Shared community block-pattern database
