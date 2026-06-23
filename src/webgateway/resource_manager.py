@@ -11,9 +11,12 @@ import sqlite3
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from webgateway.config import GatewayConfig
+
+if TYPE_CHECKING:
+    from webgateway.injection.events import EventLogger
 
 __all__ = ["ProviderResourceManager"]
 
@@ -28,11 +31,19 @@ class ProviderResourceManager:
     Args:
         db_path: Path to the SQLite database file.
         config: Full gateway config (reads circuit_breaker, quotas sections).
+        event_logger: Optional EventLogger for emitting state-transition events.
     """
 
-    def __init__(self, db_path: str, config: GatewayConfig) -> None:
+    def __init__(
+        self,
+        db_path: str,
+        config: GatewayConfig,
+        event_logger: EventLogger | None = None,
+    ) -> None:
         self._config = config
         self._db_path = db_path
+        self._event_logger = event_logger
+        self._alerted_providers: set[str] = set()
         self._conn: sqlite3.Connection | None = None
         self._init_db()
         self._prune_old_usage()
@@ -157,6 +168,13 @@ class ProviderResourceManager:
             logger.warning(
                 "Circuit OPEN for %s (half-open probe failed, error=%s)", provider, error_class
             )
+            if self._event_logger:
+                self._event_logger.log_event(
+                    event="circuit_open",
+                    provider=provider,
+                    error_class=error_class,
+                    cooldown_seconds=cb_cfg.cooldown_seconds,
+                )
             return
 
         if state["state"] == "open":
@@ -184,6 +202,13 @@ class ProviderResourceManager:
                 cb_cfg.error_threshold,
                 error_class,
             )
+            if self._event_logger:
+                self._event_logger.log_event(
+                    event="circuit_open",
+                    provider=provider,
+                    error_class=error_class,
+                    cooldown_seconds=cb_cfg.cooldown_seconds,
+                )
 
         self._save_cb_state(provider, state)
 
@@ -201,6 +226,11 @@ class ProviderResourceManager:
             state["opened_at_ts"] = None
             self._save_cb_state(provider, state)
             logger.info("Circuit CLOSED for %s (half-open probe succeeded)", provider)
+            if self._event_logger:
+                self._event_logger.log_event(
+                    event="circuit_closed",
+                    provider=provider,
+                )
             return
 
         if state["state"] == "open":
@@ -296,11 +326,33 @@ class ProviderResourceManager:
         else:
             pct = 0.0
 
+        if (
+            qcfg
+            and pct >= qcfg.alert_at_percent
+            and provider not in self._alerted_providers
+        ):
+            self._alerted_providers.add(provider)
+            if self._event_logger:
+                self._event_logger.log_event(
+                    event="quota_alert",
+                    provider=provider,
+                    pct_used=round(pct, 1),
+                    limit_month=limit_month,
+                )
+
         exhausted = False
         if limit_month is not None and qc >= limit_month:
             exhausted = True
         if limit_today is not None and qd >= limit_today:
             exhausted = True
+
+        if exhausted and self._event_logger:
+            self._event_logger.log_event(
+                event="quota_exhausted",
+                provider=provider,
+                calls_month=qc,
+                limit_month=limit_month,
+            )
 
         return {
             "calls_month": qc,
@@ -399,17 +451,16 @@ class ProviderResourceManager:
         return result
 
     async def get_history(self, provider: str, days: int = 30) -> list[dict[str, Any]]:
-        """Daily rollup for the given provider."""
+        """Daily rollup with p50/p95 latency percentiles for the given provider."""
         assert self._conn is not None
         now = time.time()
         cutoff = now - days * 86400
-        rows = self._conn.execute(
+
+        agg_rows = self._conn.execute(
             """SELECT
                    CAST(ts / 86400 AS INTEGER) * 86400 AS day_bucket,
                    COUNT(*) AS calls,
-                   SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS errors,
-                   AVG(CASE WHEN latency_ms IS NOT NULL THEN latency_ms ELSE NULL END)
-                       AS avg_latency
+                   SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS errors
                FROM provider_usage
                WHERE provider = ? AND ts >= ?
                GROUP BY day_bucket
@@ -417,17 +468,44 @@ class ProviderResourceManager:
             (provider, cutoff),
         ).fetchall()
 
+        if not agg_rows:
+            return []
+
+        day_buckets = [row[0] for row in agg_rows]
+
+        latency_rows = self._conn.execute(
+            """SELECT
+                   CAST(ts / 86400 AS INTEGER) * 86400 AS day_bucket,
+                   latency_ms
+               FROM provider_usage
+               WHERE provider = ? AND ts >= ? AND latency_ms IS NOT NULL""",
+            (provider, cutoff),
+        ).fetchall()
+
+        latencies_by_day: dict[int, list[int]] = {d: [] for d in day_buckets}
+        for day_ts, lat_ms in latency_rows:
+            if day_ts in latencies_by_day:
+                latencies_by_day[day_ts].append(lat_ms)
+
         result = []
-        for row in rows:
+        for row in agg_rows:
             day_ts = row[0]
             calls = row[1]
             errors = row[2] or 0
-            avg_lat = row[3] or 0
+            day_lats = sorted(latencies_by_day.get(day_ts, []))
+            p50 = day_lats[len(day_lats) // 2] if day_lats else 0
+            p95_idx = int(len(day_lats) * 0.95) if day_lats else -1
+            p95 = (
+                day_lats[p95_idx]
+                if day_lats and p95_idx < len(day_lats)
+                else (day_lats[-1] if day_lats else 0)
+            )
             result.append({
                 "date": datetime.fromtimestamp(day_ts, tz=UTC).strftime("%Y-%m-%d"),
                 "calls": calls,
                 "errors": errors,
                 "error_rate": round(errors / calls * 100, 1) if calls > 0 else 0.0,
-                "avg_latency_ms": round(avg_lat, 0),
+                "latency_p50_ms": p50,
+                "latency_p95_ms": p95,
             })
         return result

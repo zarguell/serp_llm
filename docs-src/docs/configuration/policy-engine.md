@@ -35,3 +35,52 @@ policies:
       - searxng
       - crawl4ai
 ```
+
+## Dry Run — Preview Policy Decisions
+
+Append `?dry_run=true` to `/search` or `/extract` to see what the policy engine would decide without executing the request. Useful for debugging routing rules and verifying fallback chains.
+
+```bash
+# Preview search routing
+curl -X POST "http://localhost:8080/search?dry_run=true" \
+  -H "Authorization: Bearer $AGENT1_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "machine learning papers", "num_results": 5}'
+
+# Preview extract routing
+curl -X POST "http://localhost:8080/extract?dry_run=true" \
+  -H "Authorization: Bearer $AGENT1_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.reddit.com/r/python"}'
+```
+
+Response shows the full routing decision:
+
+```json
+{
+  "decision": {
+    "policy_matched": "reddit",
+    "provider": "invisible_playwright",
+    "proxy": "gluetun",
+    "fallback_chain": ["firecrawl", "jina"],
+    "retry_strategy": "fallback",
+    "dlp_policy": null,
+    "judge_invoked": false,
+    "judge_reasoning_tag": null
+  },
+  "request_id": "req_a1b2c3"
+}
+```
+
+**Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `policy_matched` | Name of the matched policy rule, or `null` if no rule matched (uses defaults) |
+| `provider` | Provider selected for this request |
+| `proxy` | Named proxy, or `null` if no proxy |
+| `fallback_chain` | Ordered list of fallback providers |
+| `retry_strategy` | Retry strategy from the matched rule |
+| `dlp_policy` | DLP policy applied, or `null` |
+| `judge_invoked` | Whether the LLM judge was consulted for this decision |
+| `judge_reasoning_tag` | Tag from the LLM judge explaining its reasoning |

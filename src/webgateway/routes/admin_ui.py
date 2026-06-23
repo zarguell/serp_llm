@@ -422,10 +422,15 @@ async def usage_page(
                 history = await rm.get_history(name, days=_range_to_days(range))
                 calls = sum(h.get("calls", 0) for h in history)
                 errors = sum(h.get("errors", 0) for h in history)
-                latencies = [
-                    h.get("avg_latency_ms", 0)
+                latencies_p50 = [
+                    h.get("latency_p50_ms", 0)
                     for h in history
-                    if h.get("avg_latency_ms")
+                    if h.get("latency_p50_ms")
+                ]
+                latencies_p95 = [
+                    h.get("latency_p95_ms", 0)
+                    for h in history
+                    if h.get("latency_p95_ms")
                 ]
                 stats = {
                     "provider": name,
@@ -435,12 +440,12 @@ async def usage_page(
                         (errors / calls * 100) if calls > 0 else 0.0
                     ),
                     "p50_latency": (
-                        sorted(latencies)[len(latencies) // 2]
-                        if latencies else 0
+                        sorted(latencies_p50)[len(latencies_p50) // 2]
+                        if latencies_p50 else 0
                     ),
                     "p95_latency": (
-                        sorted(latencies)[int(len(latencies) * 0.95)]
-                        if latencies else 0
+                        sorted(latencies_p95)[int(len(latencies_p95) * 0.95)]
+                        if latencies_p95 else 0
                     ),
                     "cost_units": 0.0,
                 }

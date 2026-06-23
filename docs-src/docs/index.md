@@ -6,6 +6,7 @@ Self-hosted, Docker-native FastAPI gateway that abstracts web search and content
 
 - **Unified API** — Single `POST /search` and `POST /extract` for all providers
 - **Policy-Driven** — YAML routing rules based on domain, content type, API key, error class
+- **Dry Run** — `?dry_run=true` previews policy decisions without executing requests
 - **Provider Adapters** — SearXNG, Brave, Tavily, Jina, Firecrawl, invisible_playwright, and more
 - **DLP** — Regex-based data loss prevention (outbound + inbound) adapted from Gitleaks
 - **Caching** — SQLite-backed response cache with TTL rules, invalidation triggers, quality gates

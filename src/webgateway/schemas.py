@@ -236,7 +236,8 @@ class UsageHistoryItem(BaseModel):
     calls: int
     errors: int
     error_rate: float
-    avg_latency_ms: float
+    latency_p50_ms: int
+    latency_p95_ms: int
 
 
 class QuotaResetRequest(BaseModel):

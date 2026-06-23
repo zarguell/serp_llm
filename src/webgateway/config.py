@@ -278,9 +278,42 @@ class QuotasConfig(BaseModel):
     providers: dict[str, QuotaProviderConfig] = Field(default_factory=dict)
 
 
+class WebhookConfig(BaseModel):
+    """Configuration for webhook alert delivery (Slack, Discord, ntfy, generic)."""
+
+    url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class SmtpConfig(BaseModel):
+    """Configuration for SMTP email alert delivery.
+
+    All secret fields (username, password) are intended to be set via
+    ``${ENV_VAR}`` interpolation in ``config.yaml``, never hardcoded.
+    """
+
+    enabled: bool = False
+    host: str | None = None
+    port: int = 587
+    username: str | None = None
+    password: str | None = None
+    use_tls: bool = True
+    from_addr: str = "webgateway@localhost"
+    to_addrs: list[str] = Field(default_factory=list)
+    subject_prefix: str = "[WebGateway]"
+
+
 class AlertConfig(BaseModel):
-    webhook_url: str | None = None
+    """Alert delivery configuration (PRD §18.7).
+
+    Controls which events trigger notifications and through which channels.
+    Both webhook and SMTP are optional — configure one or both.
+    """
+
     events: list[str] = Field(default_factory=list)
+    suppress_seconds: int = 300
+    webhook: WebhookConfig = Field(default_factory=WebhookConfig)
+    smtp: SmtpConfig = Field(default_factory=SmtpConfig)
 
 
 class MCPConfig(BaseModel):

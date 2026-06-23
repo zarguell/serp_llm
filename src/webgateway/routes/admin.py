@@ -18,6 +18,7 @@ from webgateway.schemas import (
     QuotaOverrideRequest,
     QuotaResetRequest,
     ReloadResponse,
+    UsageHistoryItem,
     UsageSummaryItem,
     UsageSummaryResponse,
 )
@@ -60,13 +61,13 @@ async def usage_summary(
     return UsageSummaryResponse(providers=items)
 
 
-@router.get("/admin/usage/history")
+@router.get("/admin/usage/history", response_model=list[UsageHistoryItem])
 async def usage_history(
     request: Request,
     key: Annotated[AuthKey, Depends(verify_admin)],
     provider: str,
     days: int = 30,
-) -> list[dict]:
+) -> list[UsageHistoryItem]:
     """Return daily usage history for a provider."""
     rm: ProviderResourceManager | None = getattr(request.app.state, "resource_manager", None)
     if rm is None:

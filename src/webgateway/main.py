@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from webgateway.admin_session import AdminSessionManager
+from webgateway.alerting import AlertDispatcher
 from webgateway.audit import AuditLogger
 from webgateway.cache.store import CacheStore
 from webgateway.config import ConfigManager
@@ -85,9 +86,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.dlp_middleware = dlp_middleware
 
+    # --- Events + Alerting (PRD §18.7) ---
+    events_path = os.environ.get("EVENTS_PATH", "/app/logs/events.jsonl")
+    alert_dispatcher = AlertDispatcher(config_manager.config.alerts)
+    event_logger = EventLogger(
+        events_path=events_path, alert_dispatcher=alert_dispatcher
+    )
+    app.state.event_logger = event_logger
+
     resource_manager = ProviderResourceManager(
         db_path="data/resource_manager.db",
         config=config_manager.config,
+        event_logger=event_logger,
     )
     app.state.resource_manager = resource_manager
 
@@ -120,14 +130,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # --- Prompt injection detector (optional, PRD §27) ---
     injection_detector: InjectionDetector | None = None
-    event_logger: EventLogger | None = None
     pi_config = config_manager.config.prompt_injection
     if pi_config.enabled:
         injection_detector = InjectionDetector(pi_config)
         app.state.injection_detector = injection_detector
-        events_path = os.environ.get("EVENTS_PATH", "/app/logs/events.jsonl")
-        event_logger = EventLogger(events_path=events_path)
-        app.state.event_logger = event_logger
 
     # --- Post-processing pipeline ---
     dedup_store = None
