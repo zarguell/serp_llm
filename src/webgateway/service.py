@@ -55,7 +55,7 @@ from webgateway.schemas import (
     SearchResultItem,
 )
 from webgateway.sessions.manager import SessionError, SessionManager
-from webgateway.sessions.models import SessionData
+from webgateway.sessions.models import CookieEntry, SessionData
 
 # Patterns that indicate a provider response was blocked by bot detection.
 # When the fallback loop detects these in a response, it auto-injects a
@@ -946,6 +946,14 @@ class GatewayService:
         list.  *decision* is mutated in place so audit can observe whether
         the judge was consulted.
 
+        When a bot block is detected in the result, the gateway
+        automatically:
+        1. Checks for cached FlareSolverr cookies for the target host.
+        2. If cached, injects cookies and retries the original browser
+           provider.
+        3. If not cached, dispatches FlareSolverr to solve the challenge,
+           stores the resulting cookies, and retries the browser provider.
+
         Returns:
             ``(result, provider_name, quality_passed)``.
         """
@@ -968,31 +976,89 @@ class GatewayService:
         last_result: Any = None
         last_provider: str = provider_name
 
+        mutable_args: list[Any] = list(args)
+        flaresolverr_cookies_stored = False
+        original_browser_provider: str | None = None
+
         for idx, candidate_name in enumerate(candidates):
             try:
                 provider = self._provider_registry.get(candidate_name)
-                result = await operation(provider, *args)
+                result = await operation(provider, *mutable_args)
 
                 if validator is not None:
                     passed, _reason = validator(result)
                     if not passed:
                         last_result = result
                         last_provider = candidate_name
-                        # Auto-inject bot-solving providers when content looks
-                        # like a CAPTCHA or bot-detection page.  This lets the
-                        # gateway transparently reroute through FlareSolverr or
-                        # invisible_playwright without per-domain policy rules.
                         content = getattr(result, "content", "")
+
                         if _is_bot_block(content):
+                            host = urlparse(url).hostname if url else None
+
+                            if (
+                                host
+                                and self._session_manager is not None
+                                and not flaresolverr_cookies_stored
+                            ):
+                                fs_cookies = await self._load_flaresolverr_cookies(
+                                    host,
+                                )
+                                if fs_cookies:
+                                    mutable_args = self._inject_cookies_into_args(
+                                        mutable_args, fs_cookies,
+                                    )
+                                    flaresolverr_cookies_stored = True
+                                    if original_browser_provider is None:
+                                        original_browser_provider = candidate_name
+                                    self._insert_candidate(
+                                        candidates, original_browser_provider, idx + 1,
+                                    )
+                                    if idx < len(candidates) - 1:
+                                        continue
+                                    return result, candidate_name, False
+
                             for solver in _BOT_SOLVERS:
                                 if (
                                     solver not in candidates
                                     and self._provider_registry.has(solver)
                                 ):
                                     candidates.append(solver)
+
+                            if (
+                                original_browser_provider is None
+                                and candidate_name != "flaresolverr"
+                            ):
+                                original_browser_provider = candidate_name
+
                         if idx < len(candidates) - 1:
                             continue
                         return result, candidate_name, False
+
+                # FlareSolverr cookie extraction and browser retry
+                if (
+                    candidate_name == "flaresolverr"
+                    and hasattr(result, "cookies")
+                    and result.cookies
+                    and url
+                ):
+                    await self._save_flaresolverr_cookies(url, result.cookies)
+                    flaresolverr_cookies_stored = True
+
+                    if original_browser_provider is not None:
+                        fs_cookies = {
+                            c["name"]: c["value"]
+                            for c in result.cookies
+                            if isinstance(c, dict) and "name" in c
+                        }
+                        if fs_cookies:
+                            mutable_args = self._inject_cookies_into_args(
+                                mutable_args, fs_cookies,
+                            )
+                            self._insert_candidate(
+                                candidates,
+                                original_browser_provider,
+                                idx + 1,
+                            )
 
                 return result, candidate_name, True
             except ProviderError as e:
@@ -1032,6 +1098,87 @@ class GatewayService:
                 continue
 
         return last_result, last_provider, False
+
+    # ------------------------------------------------------------------
+    # FlareSolverr cookie session helpers
+    # ------------------------------------------------------------------
+
+    async def _load_flaresolverr_cookies(self, host: str) -> dict[str, str] | None:
+        assert self._session_manager is not None
+        profile = f"flaresolverr/{host}"
+        try:
+            session = self._session_manager._store.load(profile)
+        except Exception:
+            return None
+
+        if not session.cookies:
+            return None
+
+        now = time.time()
+        if session.expiry_ts is not None and now > session.expiry_ts:
+            self._session_manager._store.delete(profile)
+            return None
+
+        return {c.name: c.value for c in session.cookies}
+
+    async def _save_flaresolverr_cookies(self, url: str, cookies: list[dict]) -> None:
+        if self._session_manager is None:
+            return
+
+        host = urlparse(url).hostname or "unknown"
+        profile = f"flaresolverr/{host}"
+        now = time.time()
+
+        cookie_entries = [
+            CookieEntry(
+                name=c["name"],
+                value=c["value"],
+                domain=c.get("domain", host),
+                path=c.get("path", "/"),
+                secure=c.get("secure", True),
+                http_only=c.get("httpOnly", True),
+            )
+            for c in cookies
+            if isinstance(c, dict) and "name" in c
+        ]
+
+        session = SessionData(
+            session_id=profile,
+            browser_service="flaresolverr",
+            domain=host,
+            cookies=cookie_entries,
+            user_agent="",
+            fingerprint_id="",
+            created_ts=now,
+            last_used_ts=now,
+            expiry_ts=now + 3600,
+        )
+        self._session_manager._store.save(session)
+
+    @staticmethod
+    def _inject_cookies_into_args(
+        args: list[Any], cookies: dict[str, str],
+    ) -> list[Any]:
+        new_args = list(args)
+        for i, arg in enumerate(new_args):
+            if isinstance(arg, ExtractOptions):
+                merged = (
+                    {**arg.session_cookies, **cookies}
+                    if arg.session_cookies
+                    else cookies
+                )
+                new_args[i] = ExtractOptions(
+                    format=arg.format,
+                    proxy_url=arg.proxy_url,
+                    wait_for_selector=arg.wait_for_selector,
+                    session_cookies=merged,
+                    session_id=arg.session_id,
+                    fingerprint_id=arg.fingerprint_id,
+                    user_agent=arg.user_agent,
+                    timeout=arg.timeout,
+                )
+                break
+        return new_args
 
     def _try_error_policy_redirect(
         self,

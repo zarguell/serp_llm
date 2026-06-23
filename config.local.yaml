@@ -50,7 +50,7 @@ policies:
     match:
       domain_glob:
         - "*.etsy.com"
-    extract_provider: flaresolverr
+    extract_provider: cdp_chrome
     extract_strategy:
       priority:
         - json_ld
@@ -61,7 +61,7 @@ policies:
     match:
       domain_glob:
         - "*.bestbuy.com"
-    extract_provider: flaresolverr
+    extract_provider: cdp_chrome
     extract_strategy:
       priority:
         - json_ld
@@ -72,7 +72,7 @@ policies:
     match:
       domain_glob:
         - "*.walmart.com"
-    extract_provider: flaresolverr
+    extract_provider: cdp_chrome
     extract_strategy:
       priority:
         - json_ld
