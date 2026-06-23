@@ -21,8 +21,7 @@ services:
       - webgateway-data:/app/data
       - webgateway-logs:/app/logs
     depends_on:
-      searxng:
-        condition: service_healthy
+      - searxng
     environment:
       - AGENT1_KEY=${AGENT1_KEY:-local-agent-key}
     restart: unless-stopped
@@ -35,10 +34,11 @@ services:
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:-local-secret}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/search?q=health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 2>&1 | grep -qi searxng || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 15s
     restart: unless-stopped
 
   cdp-chrome:
