@@ -10,6 +10,7 @@ from webgateway.post_processing.cleaners import clean_markdown
 from webgateway.post_processing.converters import convert_to_markdown
 from webgateway.post_processing.dedup import DedupStore
 from webgateway.post_processing.extractors import extract_main_content
+from webgateway.post_processing.strategies import StrategySelector
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class PostProcessingResult:
     content_unchanged: bool = False
     content_hash: str | None = None
     injection: InjectionDetectionResult | None = None
+    structured_data: dict | list | None = None
 
 
 class PostProcessingPipeline:
@@ -36,10 +38,13 @@ class PostProcessingPipeline:
     def __init__(
         self,
         config: PostProcessingConfig,
+        *,
+        strategy_selector: StrategySelector | None = None,
         dedup_store: DedupStore | None = None,
         injection_detector: InjectionDetector | None = None,
     ) -> None:
         self._config = config
+        self._strategy_selector = strategy_selector
         self._dedup = dedup_store
         self._injection_detector = injection_detector
 
@@ -56,11 +61,30 @@ class PostProcessingPipeline:
         *,
         format: str = "html",
         provider: str | None = None,
+        policy_matched: str | None = None,
         skip_injection: bool = False,
     ) -> PostProcessingResult:
         """Run the full pipeline on *content*."""
         raw_len = len(content)
         pcfg = self._get_provider_config(provider or "")
+        structured_data: dict | list | None = None
+
+        # Stage 0: extraction strategy (policy-driven, JSON-LD etc.)
+        if self._strategy_selector is not None and format == "html":
+            strategy_result = await self._strategy_selector.run(
+                content, url, policy_matched=policy_matched,
+            )
+            if strategy_result is not None:
+                content = strategy_result.content
+                format = strategy_result.format
+                structured_data = strategy_result.structured_data
+                # Override config to skip stages 1-2 (strategy output is clean)
+                pcfg = ExtractorConfig(
+                    stage1_extractor="none",
+                    stage2_converter="none",
+                    stage3_clean=pcfg.stage3_clean,
+                    stage4_deduplicate=pcfg.stage4_deduplicate,
+                )
 
         # Stage 1: Main content extraction
         extractor = pcfg.stage1_extractor
@@ -121,4 +145,5 @@ class PostProcessingPipeline:
             content_unchanged=content_unchanged,
             content_hash=content_hash,
             injection=injection_result,
+            structured_data=structured_data,
         )
