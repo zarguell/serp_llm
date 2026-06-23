@@ -186,3 +186,52 @@ class TestFlareSolverrAdapter:
         adapter = FlareSolverrAdapter()
         assert adapter._base_url == "http://localhost:8191"
         assert adapter._max_timeout == 60000
+
+    async def test_extract_returns_cookies(
+        self, adapter: FlareSolverrAdapter, httpx_mock: HTTPXMock
+    ):
+        cookies = [
+            {"name": "cf_clearance", "value": "abc123", "domain": ".example.com"},
+            {"name": "session_id", "value": "xyz789", "domain": ".example.com"},
+        ]
+        httpx_mock.add_response(
+            method="POST",
+            url="http://flaresolverr:8191/v1",
+            json={
+                "status": "ok",
+                "message": "Challenge solved!",
+                "solution": {
+                    "url": "https://example.com/protected-page",
+                    "status": 200,
+                    "headers": {},
+                    "response": "<html><body>Protected content</body></html>",
+                    "cookies": cookies,
+                },
+            },
+        )
+        result = await adapter.extract(
+            "https://example.com/protected-page",
+            ExtractOptions(),
+        )
+        assert result.content == "<html><body>Protected content</body></html>"
+        assert result.cookies == cookies
+
+    async def test_extract_no_cookies_in_response(
+        self, adapter: FlareSolverrAdapter, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(
+            method="POST",
+            url="http://flaresolverr:8191/v1",
+            json={
+                "status": "ok",
+                "solution": {
+                    "url": "https://example.com/page",
+                    "response": "<html>content</html>",
+                },
+            },
+        )
+        result = await adapter.extract(
+            "https://example.com/page",
+            ExtractOptions(),
+        )
+        assert result.cookies is None
