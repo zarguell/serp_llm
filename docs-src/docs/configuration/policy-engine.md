@@ -97,6 +97,9 @@ These domains have `json_ld` → `meta_extract` → `article_extract` priority c
 | `*.etsy.com` | invisible_playwright | Stealth browser required |
 | `*.bestbuy.com` | invisible_playwright | Stealth browser required |
 | `*.walmart.com` | invisible_playwright | Stealth browser required |
+| `*.rottentomatoes.com` | CDP Chrome (default) | Movie/TV ratings JSON-LD |
+| `*.goodreads.com` | CDP Chrome (default) | Book metadata JSON-LD |
+| `*.stackoverflow.com`, `*.stackexchange.com` | CDP Chrome (default) | Q&A JSON-LD |
 
 Add more by adding policy rules with `extract_strategy` to your `config.yaml`.
 

@@ -79,6 +79,37 @@ policies:
         - meta_extract
         - article_extract
 
+  - name: rottentomatoes
+    match:
+      domain_glob:
+        - "*.rottentomatoes.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - meta_extract
+        - article_extract
+
+  - name: goodreads
+    match:
+      domain_glob:
+        - "*.goodreads.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - meta_extract
+        - article_extract
+
+  - name: stackoverflow
+    match:
+      domain_glob:
+        - "*.stackoverflow.com"
+        - "*.stackexchange.com"
+    extract_strategy:
+      priority:
+        - json_ld
+        - meta_extract
+        - article_extract
+
 providers:
   searxng:
     base_url: http://searxng:8080
