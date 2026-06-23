@@ -1,0 +1,53 @@
+# Lightweight local compose stack — WebGateway + SearXNG + CDP Chrome sidecar.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml --profile local up -d --build
+#
+# Requires:
+#   - config.local.yaml in project root
+#   - Chrome running on host with --remote-debugging-port=9222
+#
+# Profile-based so it can safely be merged with other compose files:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml --profile local up -d
+
+services:
+  webgateway:
+    profiles: ["local"]
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.local.yaml:/app/config.yaml:ro
+      - webgateway-data:/app/data
+      - webgateway-logs:/app/logs
+    depends_on:
+      searxng:
+        condition: service_healthy
+    environment:
+      - AGENT1_KEY=${AGENT1_KEY:-local-agent-key}
+    restart: unless-stopped
+
+  searxng:
+    profiles: ["local"]
+    image: searxng/searxng:latest
+    ports:
+      - "8081:8080"
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-local-secret}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/search?q=health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  cdp-chrome:
+    profiles: ["local"]
+    build: services/cdp-chrome/
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  webgateway-data:
+  webgateway-logs:
