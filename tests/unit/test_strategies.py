@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from webgateway.post_processing.strategies.json_ld import JsonLdStrategy
+from webgateway.post_processing.strategies.json_ld import (
+    JsonLdStrategy,
+    _extract_name,
+    _format_iso8601_duration,
+    flatten_jsonld_to_markdown,
+)
 from webgateway.post_processing.strategies.meta_extract import MetaExtractStrategy
 
 
@@ -151,6 +156,203 @@ class TestJsonLdStrategy:
         result = await strategy.extract(html, "https://example.com/graph")
         assert result is not None
         assert "Graph Product" in result.content
+
+    async def test_tvseries_extracts_genre_and_cast(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "TVSeries",
+            "name": "Stranger Things",
+            "description": "A group of kids uncover supernatural mysteries.",
+            "genre": ["Sci-Fi", "Horror", "Drama"],
+            "contentRating": "TV-14",
+            "actor": [
+                {"@type": "Person", "name": "Millie Bobby Brown"},
+                {"@type": "Person", "name": "David Harbour"}
+            ],
+            "creator": {"@type": "Person", "name": "The Duffer Brothers"},
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "8.7",
+                "reviewCount": "1200"
+            }
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/tv")
+        assert result is not None
+        assert "Stranger Things" in result.content
+        assert "Sci-Fi" in result.content
+        assert "TV-14" in result.content
+        assert "Millie Bobby Brown" in result.content
+        assert "David Harbour" in result.content
+        assert "The Duffer Brothers" in result.content
+        assert "8.7" in result.content
+
+    async def test_tvepisode_with_season_episode_numbers(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "TVEpisode",
+            "name": "The Battle of Winterfell",
+            "description": "The living make their final stand.",
+            "episodeNumber": 3,
+            "partOfSeason": {"@type": "TVSeason", "seasonNumber": 8},
+            "partOfSeries": {"@type": "TVSeries", "name": "Game of Thrones"},
+            "duration": "PT1H22M",
+            "contentRating": "TV-MA"
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/episode")
+        assert result is not None
+        assert "The Battle of Winterfell" in result.content
+        assert "Game of Thrones" in result.content
+        assert "3" in result.content
+        assert "8" in result.content
+        assert "1h 22m" in result.content
+        assert "TV-MA" in result.content
+
+    async def test_musicalbum_extracts_artist_and_genre(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "MusicAlbum",
+            "name": "Thriller",
+            "description": "The best-selling album of all time.",
+            "byArtist": {"@type": "MusicGroup", "name": "Michael Jackson"},
+            "genre": "Pop",
+            "datePublished": "1982-11-30",
+            "inLanguage": "en"
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/album")
+        assert result is not None
+        assert "Thriller" in result.content
+        assert "Michael Jackson" in result.content
+        assert "Pop" in result.content
+        assert "1982-11-30" in result.content
+        assert "English" in result.content or "en" in result.content
+
+    async def test_videogame_extracts_platform_and_rating(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "VideoGame",
+            "name": "Elden Ring",
+            "description": "An action RPG from FromSoftware.",
+            "applicationCategory": "Game",
+            "operatingSystem": "Windows, PlayStation, Xbox",
+            "genre": "Action RPG",
+            "contentRating": "Mature",
+            "offers": {
+                "@type": "Offer",
+                "price": "59.99",
+                "priceCurrency": "USD"
+            }
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/game")
+        assert result is not None
+        assert "Elden Ring" in result.content
+        assert "Action RPG" in result.content
+        assert "Game" in result.content
+        assert "Windows" in result.content
+        assert "59.99" in result.content
+
+    async def test_creativework_fallback(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "CreativeWork",
+            "name": "A Generic Work",
+            "description": "Fallback for lesser-known types.",
+            "author": [
+                {"@type": "Person", "name": "Author One"},
+                {"@type": "Person", "name": "Author Two"}
+            ],
+            "datePublished": "2024-06-01",
+            "inLanguage": "en"
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/work")
+        assert result is not None
+        assert "A Generic Work" in result.content
+        assert "Author One" in result.content
+        assert "Author Two" in result.content
+
+
+class TestJsonLdHelpers:
+    def test_extract_name_from_string(self):
+        assert _extract_name("Pop") == "Pop"
+
+    def test_extract_name_from_dict(self):
+        assert _extract_name({"@type": "Person", "name": "Director"}) == "Director"
+
+    def test_extract_name_from_list(self):
+        names = [{"name": "Actor A"}, {"name": "Actor B"}]
+        assert _extract_name(names) == "Actor A, Actor B"
+
+    def test_extract_name_returns_none(self):
+        assert _extract_name(None) is None
+        assert _extract_name([]) is None
+
+    def test_format_duration_standard(self):
+        assert _format_iso8601_duration("PT2H15M") == "2h 15m"
+
+    def test_format_duration_hours_only(self):
+        assert _format_iso8601_duration("PT1H") == "1h"
+
+    def test_format_duration_with_seconds(self):
+        assert _format_iso8601_duration("PT1H30M20S") == "1h 30m 20s"
+
+    def test_format_duration_with_days(self):
+        assert _format_iso8601_duration("P1DT2H") == "1d 2h"
+
+    def test_format_duration_invalid_returns_original(self):
+        assert _format_iso8601_duration("unknown") == "unknown"
+
+    def test_format_duration_minutes_only(self):
+        assert _format_iso8601_duration("PT30M") == "30m"
+
+    async def test_multiple_authors_via_strategy(self, strategy: JsonLdStrategy):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+            "@type": "Book",
+            "name": "Multi-Author Book",
+            "author": [
+                {"@type": "Person", "name": "Author A"},
+                {"@type": "Person", "name": "Author B"}
+            ],
+            "isbn": "1234567890"
+        }
+        </script>
+        </head></html>
+        """
+        result = await strategy.extract(html, "https://example.com/book")
+        assert result is not None
+        assert "Author A, Author B" in result.content
+        assert "1234567890" in result.content
 
 
 @pytest.fixture
