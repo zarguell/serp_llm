@@ -104,7 +104,7 @@ async def login_form(
     """Render the admin login form."""
     ctx = _get_common_context(request)
     ctx["error"] = error
-    return _templates.TemplateResponse("login.html", ctx)
+    return _templates.TemplateResponse(request, "login.html", ctx)
 
 
 @router.post("/admin/login")
@@ -122,6 +122,7 @@ async def login_submit(
     key = _find_key(api_key, request)
     if key is None or not key.admin:
         return _templates.TemplateResponse(
+            request,
             "login.html",
             {
                 "request": request,
@@ -267,7 +268,7 @@ async def dashboard(
     alerts = _read_recent_alerts(events_path, limit=10)
     ctx["alerts"] = alerts
 
-    return _templates.TemplateResponse("dashboard.html", ctx)
+    return _templates.TemplateResponse(request, "dashboard.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ async def keys_page(
         }
         for k in keys
     ]
-    return _templates.TemplateResponse("keys.html", ctx)
+    return _templates.TemplateResponse(request, "keys.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +350,7 @@ async def providers_page(
                 "warnings": list(meta.warnings) if meta.warnings else [],
             })
     ctx["providers"] = providers
-    return _templates.TemplateResponse("providers.html", ctx)
+    return _templates.TemplateResponse(request, "providers.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +390,7 @@ async def sessions_page(
         except Exception:
             logger.exception("Failed to list sessions")
     ctx["sessions"] = sessions
-    return _templates.TemplateResponse("sessions.html", ctx)
+    return _templates.TemplateResponse(request, "sessions.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -457,7 +458,7 @@ async def usage_page(
     # Per-key stats (from audit log)
     ctx["key_stats"] = _compute_key_stats(_range_to_days(range))
 
-    return _templates.TemplateResponse("usage.html", ctx)
+    return _templates.TemplateResponse(request, "usage.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +492,7 @@ async def logs_page(
     )
     ctx["entries"] = entries
 
-    return _templates.TemplateResponse("logs.html", ctx)
+    return _templates.TemplateResponse(request, "logs.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +519,7 @@ async def logs_partial(
     log_path = _get_log_path()
     entries = _read_log_entries(log_path, limit=100, filters=filters)
     return _templates.TemplateResponse(
-        "logs_partial.html", {"request": request, "entries": entries}
+        request, "logs_partial.html", {"request": request, "entries": entries}
     )
 
 
@@ -565,7 +566,7 @@ async def cache_page(
     ctx["top_domains"] = top_domains
     ctx["providers"] = providers
 
-    return _templates.TemplateResponse("cache.html", ctx)
+    return _templates.TemplateResponse(request, "cache.html", ctx)
 
 
 # ---------------------------------------------------------------------------
