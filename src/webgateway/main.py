@@ -32,6 +32,7 @@ from webgateway.injection.types import InjectionBlockedError
 from webgateway.judge import LLMJudge
 from webgateway.key_store import KeyStore
 from webgateway.mcp.server import mount_mcp
+from webgateway.middleware.security_headers import SecurityHeadersMiddleware
 from webgateway.policy.engine import PolicyEngine
 from webgateway.post_processing.dedup import DedupStore
 from webgateway.post_processing.pipeline import PostProcessingPipeline
@@ -276,6 +277,9 @@ def create_app() -> FastAPI:
 
     # --- Rate limiting middleware ---
     app.add_middleware(RateLimitMiddleware)
+
+    # --- Security headers ---
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # --- Exception handlers ---
     @app.exception_handler(ProviderError)

@@ -37,8 +37,7 @@ Thumbs.db
 .omo/
 .playwright-mcp/
 
-# Docs (rebuilt in docs-builder stage)
-docs-src/
+# Docs (rebuilt in docs-builder stage — keep docs-src/, it's a build input)
 docs/
 PRD.md
 PRD-addendum*.md
