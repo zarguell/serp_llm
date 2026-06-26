@@ -30,10 +30,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._fastapi_app = fastapi_app
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        import sys
+        print("=== RATE LIMIT DISPATCH CALLED ===", file=sys.stderr)
         limiter: SlidingWindowRateLimiter | None = getattr(
             self._fastapi_app.state, "rate_limiter", None
         )
         if limiter is None:
+            print("=== rate_limiter is None ===", file=sys.stderr)
+            return await call_next(request)
+
+        config = self._fastapi_app.state.config_manager.config.rate_limiting
+        if not config.enabled:
+            print("=== rate limiting not enabled ===", file=sys.stderr)
             return await call_next(request)
 
         config = self._fastapi_app.state.config_manager.config.rate_limiting
