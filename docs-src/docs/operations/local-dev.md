@@ -199,6 +199,13 @@ mcp:
 }
 ```
 
+> **Remote deployments:** When connecting through a reverse proxy with HTTPS,
+> the MCP endpoint uses Streamable HTTP. No special transport configuration
+> is needed — clients that only support SSE will see a probe error, but
+> Streamable HTTP clients connect normally. See the
+> [MCP design docs](/architecture/mcp-design.md) for details on the reverse
+> proxy transport setup.
+
 Once connected, your agent gains two tools:
 
 - **`web_search`** — searches the web through SearXNG

@@ -30,11 +30,33 @@ serpLLM is **infrastructure for intelligent agents**, not a standalone tool. Age
 
 ## Implementation
 
-- **Transport:** Streamable HTTP (stateless)
+- **Transport:** Streamable HTTP (stateless) — MCP spec 2025-03-26
 - **Library:** `mcp>=1.27,<2` — official Python MCP SDK via `FastMCP`
 - **Auth:** Bearer token, shared with REST API via `McpAuthMiddleware`
 - **Dispatch:** Tools call `GatewayService.search()` / `.extract()` — the same pipeline as the REST API
 - **Returns:** JSON strings (`json_response=True`)
+
+### Streamable HTTP and reverse proxies
+
+serpLLM's MCP endpoint uses Streamable HTTP (POST-only JSON-RPC). Some MCP clients
+probe with a GET request first, expecting SSE. The server returns 200 on GET to
+satisfy the probe, then all actual MCP communication flows over POST.
+
+When serpLLM is deployed behind a reverse proxy (Traefik, nginx, Caddy), the
+forwarded `Host` header may not match the server's internal address. The entrypoint
+uses uvicorn's `h11` HTTP parser (instead of the default httptools) to avoid the
+strict Host validation that would reject proxied requests with `421 Misdirected
+Request`.
+
+For advanced deployments that need httptools, set the `FORWARDED_ALLOW_IPS`
+environment variable to your proxy's IP range:
+
+```yaml
+environment:
+  FORWARDED_ALLOW_IPS: "172.18.0.0/16"
+```
+
+This reverts to httptools and configures it to trust the specified proxy IPs.
 
 ## Extraction strategies
 

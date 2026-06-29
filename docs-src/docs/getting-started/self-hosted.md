@@ -252,7 +252,7 @@ Traefik automatically requests certificates on first connection and renews them 
 ## Troubleshooting
 
 | Problem | Check This |
-|---|---|
+|---|---|---|
 | Container won't start | `docker compose logs <service>` for error details |
 | Certificate errors | Regenerate certs: `rm certs/* dynamic/tls.yml` then re-run the quick start cert step, restart traefik |
 | Health checks failing | `docker compose ps` - check the STATUS column. First startup can take 60s |
@@ -260,6 +260,7 @@ Traefik automatically requests certificates on first connection and renews them 
 | SearXNG returning empty results | Check `searxng-settings.yml` has valid search engines configured |
 | Crawl4AI crashes | Check memory limits. Needs at least 1 GB reserved, 4 GB limit recommended |
 | Port 443 already in use | Stop any other service listening on 443, or change Traefik's port mapping |
+| MCP client says "invalid content type" or "SSE error" | The MCP endpoint uses Streamable HTTP. Some clients probe with GET first — the server handles this. If POST requests return `421 Misdirected Request` in the logs, uvicorn is rejecting the proxied Host header. The entrypoint uses h11 by default to prevent this. If you've overridden the CMD, ensure `--http h11` is set, or set `FORWARDED_ALLOW_IPS` to your proxy's subnet |
 
 Reset everything and start fresh:
 
