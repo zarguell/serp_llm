@@ -6,6 +6,7 @@ The `config.yaml` file defines all routing behavior, provider configuration, and
 
 ```yaml
 # Top-level keys
+max_concurrency:  # Max concurrent in-flight requests (semaphore)
 defaults:         # Default behavior when no policy matches
 policies:         # Routing rules (evaluated in order, first match wins)
 proxies:          # Named proxy definitions
@@ -54,6 +55,26 @@ providers:
 ```
 
 Provider config values support `${ENV_VAR}` and `${ENV_VAR:-default}` syntax.
+
+### max_concurrency
+
+```yaml
+max_concurrency: 3
+```
+
+Controls how many requests can hit providers simultaneously. When the LLM
+sends more requests than this limit, excess requests queue in memory until a
+slot opens. Prevents provider overload on modest hardware.
+
+**Tuning guide:**
+- 4‑core / 16 GB system: start at **2–3**
+- 8‑core / 32 GB system: **4–6**
+- 16+ cores: **8–16** (or disable with a high value)
+
+The semaphore wraps only the provider dispatch call — policy evaluation,
+DLP, and cache lookup still run concurrently. A value that is **too high**
+provides no protection. A value that is **too low** underutilises available
+bandwidth on large instances.
 
 ### rate_limiting
 

@@ -14,6 +14,8 @@ service, and format the HTTP response.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import secrets
 import time
 from collections.abc import Callable
@@ -84,6 +86,8 @@ def _is_bot_block(content: str) -> bool:
 
 __all__ = ["GatewayService"]
 
+logger = logging.getLogger(__name__)
+
 
 class GatewayService:
     """Orchestrates the full request flow from policy to provider to audit.
@@ -122,6 +126,13 @@ class GatewayService:
         self._judge = llm_judge
         self._injection_detector = injection_detector
         self._event_logger = event_logger
+
+        max_concurrency = self._config_manager.config.max_concurrency
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        logger.info(
+            "Concurrency limited to %d in-flight request(s)",
+            max_concurrency,
+        )
 
     async def _maybe_judge_policy_miss(
         self,
@@ -289,16 +300,17 @@ class GatewayService:
         )
 
         try:
-            result, provider_used, _ = await self._execute_with_fallback(
-                decision.provider,
-                decision.fallback_chain,
-                lambda provider, opts: provider.search(request.query, opts),
-                options,
-                content_type="search",
-                url=None,
-                query=request.query,
-                decision=decision,
-            )
+            async with self._semaphore:
+                result, provider_used, _ = await self._execute_with_fallback(
+                    decision.provider,
+                    decision.fallback_chain,
+                    lambda provider, opts: provider.search(request.query, opts),
+                    options,
+                    content_type="search",
+                    url=None,
+                    query=request.query,
+                    decision=decision,
+                )
         except ProviderError:
             latency_ms = int((time.perf_counter() - start) * 1000)
             await self._audit_logger.log(
@@ -594,17 +606,18 @@ class GatewayService:
         quality_validator = self._make_quality_validator()
 
         try:
-            result, provider_used, quality_passed = await self._execute_with_fallback(
-                decision.provider,
-                decision.fallback_chain,
-                lambda provider, opts: provider.extract(request.url, opts),
-                options,
-                validator=quality_validator,
-                content_type="extract",
-                url=request.url,
-                query=None,
-                decision=decision,
-            )
+            async with self._semaphore:
+                result, provider_used, quality_passed = await self._execute_with_fallback(
+                    decision.provider,
+                    decision.fallback_chain,
+                    lambda provider, opts: provider.extract(request.url, opts),
+                    options,
+                    validator=quality_validator,
+                    content_type="extract",
+                    url=request.url,
+                    query=None,
+                    decision=decision,
+                )
         except ProviderError:
             latency_ms = int((time.perf_counter() - start) * 1000)
             await self._audit_logger.log(

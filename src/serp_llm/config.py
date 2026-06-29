@@ -478,6 +478,17 @@ class GatewayConfig(BaseModel):
     quotas: QuotasConfig = Field(default_factory=QuotasConfig)
     alerts: AlertConfig = Field(default_factory=AlertConfig)
     rate_limiting: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    max_concurrency: int = Field(
+        default=3,
+        ge=1,
+        description=(
+            "Maximum concurrent in-flight requests.  When exceeded, excess "
+            "requests queue in memory until a slot opens.  Protects the host "
+            "system from provider overload when the LLM sends many requests "
+            "at once.  Tune based on your CPU cores and provider latency — "
+            "a modest 4‑core / 16 GB system should start at 2–3."
+        ),
+    )
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     post_processing: PostProcessingConfig = Field(default_factory=PostProcessingConfig)
     prompt_injection: PromptInjectionConfig = Field(default_factory=PromptInjectionConfig)

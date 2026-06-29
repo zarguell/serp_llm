@@ -1,6 +1,8 @@
 # Local development config — minimal stack
 # Uses SearXNG (search) and Crawl4AI (extract with JS rendering)
 
+max_concurrency: 3
+
 defaults:
   search_provider: searxng
   extract_provider: crawl4ai

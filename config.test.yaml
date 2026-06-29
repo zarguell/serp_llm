@@ -3,6 +3,8 @@
 # Jina is registered but its API key comes from JINA_API_KEY env var;
 # tests auto-skip when no key is present.
 
+max_concurrency: 3
+
 defaults:
   search_provider: searxng
   extract_provider: jina

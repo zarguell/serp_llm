@@ -508,6 +508,7 @@ class TestServicePolicyMissIntegration:
     async def test_judge_called_on_policy_miss(self):
         """When policy_matched is None and judge is enabled, evaluate_policy_miss fires."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         cm.config.defaults.timeout = 15
         cm.config.defaults.search_provider = "searxng"
         cm.config.defaults.extract_provider = "jina"
@@ -546,6 +547,7 @@ class TestServicePolicyMissIntegration:
     async def test_judge_not_called_when_policy_matches(self):
         """When policy_matched is not None, judge should NOT fire."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         engine = MagicMock()
         matched_decision = RoutingDecision(
             policy_matched="some_rule",
@@ -568,6 +570,7 @@ class TestServicePolicyMissIntegration:
 
     async def test_judge_not_called_when_disabled(self):
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         engine = MagicMock()
         miss_decision = RoutingDecision(
             policy_matched=None,
@@ -591,6 +594,7 @@ class TestServicePolicyMissIntegration:
     async def test_judge_returns_none_falls_through(self):
         """When judge returns None, the original decision is kept."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         engine = MagicMock()
         miss_decision = RoutingDecision(
             policy_matched=None,
@@ -614,6 +618,7 @@ class TestServicePolicyMissIntegration:
     async def test_no_judge_provided(self):
         """Service works fine without a judge."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         engine = MagicMock()
         miss_decision = RoutingDecision(
             policy_matched=None,
@@ -640,6 +645,7 @@ class TestServiceRetryIntegration:
     async def test_judge_called_on_provider_error(self):
         """When a provider fails with a trigger-matching error, judge fires."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         cm.config.defaults.timeout = 15
 
         engine = MagicMock()
@@ -705,6 +711,7 @@ class TestServiceRetryIntegration:
     async def test_judge_not_called_on_non_triggering_error(self):
         """When error class doesn't match triggers, judge is not called."""
         cm = MagicMock()
+        cm.config.max_concurrency = 3
         engine = MagicMock()
         engine.evaluate_for_error.return_value = None
 

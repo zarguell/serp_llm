@@ -1,6 +1,8 @@
 # Self-hosted configuration — zero API keys required.
 # Uses: docker-compose.selfhosted.yml
 
+max_concurrency: 3
+
 defaults:
   search_provider: searxng
   extract_provider: jina

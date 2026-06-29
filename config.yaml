@@ -6,6 +6,13 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
+# Concurrency — max in-flight requests to protect the host from overload
+# when the LLM sends many requests at once. Excess requests queue until
+# a slot opens. Tune based on CPU cores: 2-3 for 4-core, 6+ for 16-core.
+# ---------------------------------------------------------------------------
+max_concurrency: 3
+
+# ---------------------------------------------------------------------------
 # Defaults — used when no policy rule matches
 # ---------------------------------------------------------------------------
 defaults:
