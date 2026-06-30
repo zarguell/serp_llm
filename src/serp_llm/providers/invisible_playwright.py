@@ -69,9 +69,18 @@ class InvisiblePlaywrightAdapter:
 
     async def extract(self, url: str, options: ExtractOptions) -> ExtractResult:
         """Scrape *url* via the invisible_playwright sidecar."""
+        # Text mode: use document.body.innerText instead of page.content().
+        # Strips all HTML bloat (scripts, styles, tracking, nav) and returns
+        # clean visible text — similar to "select all → copy as plain text".
+        text_mode = (
+            getattr(options, "text_mode", False)
+            or getattr(options, "format", None) == "text"
+        )
+
         payload: dict[str, object] = {
             "url": url,
             "timeout": int((options.timeout or self._timeout) * 1000),
+            "text_mode": text_mode,
         }
 
         if options.proxy_url:

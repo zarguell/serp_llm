@@ -34,6 +34,7 @@ class ScrapeRequest(BaseModel):
     user_agent: str | None = None
     wait_for_selector: str | None = None
     timeout: int = 30_000
+    text_mode: bool = False
 
 
 class ScrapeResponse(BaseModel):
@@ -132,12 +133,21 @@ async def scrape(req: ScrapeRequest):
 
             title = await page.title()
 
-            # Return raw HTML for the pipeline to process (strategy extraction, trafilatura, etc.)
-            raw_html = await page.content()
+            # Return content: raw HTML for the pipeline to process (strategy extraction,
+            # trafilatura), or clean visible text when text_mode is requested.  Text mode
+            # uses document.body.innerText — the browser's built-in "select all → copy as
+            # plain text" — which strips scripts, styles, tracking, nav, and sidebars
+            # without needing any HTML parsing or PDF conversion.
+            if req.text_mode:
+                content = await page.evaluate("() => document.body.innerText")
+                fmt = "text"
+            else:
+                content = await page.content()
+                fmt = "html"
 
             return ScrapeResponse(
-                content=raw_html,
-                format="html",
+                content=content,
+                format=fmt,
                 url=req.url,
                 title=title or None,
             )

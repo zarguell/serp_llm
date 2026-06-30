@@ -24,7 +24,7 @@ class SearchOptions:
 
 @dataclass
 class ExtractOptions:
-    format: str = "markdown"  # markdown | html | json
+    format: str = "markdown"  # markdown | html | json | text
     proxy_url: str | None = None
     wait_for_selector: str | None = None
     session_cookies: dict[str, str] | None = None
@@ -32,6 +32,7 @@ class ExtractOptions:
     fingerprint_id: str | None = None
     user_agent: str | None = None
     timeout: int = 15
+    text_mode: bool = False
 
 
 # ---------------------------------------------------------------------------
