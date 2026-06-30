@@ -473,6 +473,13 @@ class GatewayService:
             query=None,
         )
 
+        if (
+            request.format == "text"
+            and request.provider is None
+            and decision.policy_matched is None
+        ):
+            decision.provider = "invisible_playwright"
+
         if dry_run:
             return DryRunResponse(
                 decision=self._to_policy_decision(decision),
