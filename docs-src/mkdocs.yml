@@ -49,6 +49,7 @@ nav:
     - Session Lifecycle: sessions/lifecycle.md
     - API Key Management: sessions/api-keys.md
     - Bootstrap & First Run: sessions/bootstrap.md
+    - Bot-Protected Sites: sessions/bot-protected-sites.md
   - Operations:
     - Admin UI Guide: operations/admin-ui.md
     - Monitoring & Alerting: operations/monitoring.md

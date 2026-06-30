@@ -261,6 +261,7 @@ Traefik automatically requests certificates on first connection and renews them 
 | Crawl4AI crashes | Check memory limits. Needs at least 1 GB reserved, 4 GB limit recommended |
 | Port 443 already in use | Stop any other service listening on 443, or change Traefik's port mapping |
 | MCP client says "invalid content type" or "SSE error" | The MCP endpoint uses Streamable HTTP. Some clients probe with GET first — the server handles this. If POST requests return `421 Misdirected Request` in the logs, uvicorn is rejecting the proxied Host header. The entrypoint uses h11 by default to prevent this. If you've overridden the CMD, ensure `--http h11` is set, or set `FORWARDED_ALLOW_IPS` to your proxy's subnet |
+| Reddit / protected sites blocked or CAPTCHA'd | Add a policy rule routing the domain to `invisible_playwright`. For persistent authenticated access, create a cookie session — see the [bot-protected sites guide](/sessions/bot-protected-sites/) |
 
 Reset everything and start fresh:
 
