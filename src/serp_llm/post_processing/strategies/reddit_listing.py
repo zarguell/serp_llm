@@ -31,10 +31,17 @@ logger = logging.getLogger(__name__)
 
 # Split the page into post-row chunks at each "midcol unvoted" boundary.
 # Each chunk contains the vote arrows + score + entry for one post.
+# Note: old.reddit.com may insert optional elements between midcol and entry
+# (e.g. <a class="thumbnail"> for link posts), so we allow extra content
+# between the closing </div> of midcol and the opening of entry.
 _CHUNK_RE = re.compile(
-    r'<div\s+class="midcol\s+unvoted">.*?</div>\s*</div>\s*'
-    r'<div\s+class="entry\s+unvoted">.*?</div>\s*</div>'
-    r'\s*<div\s+class="clearleft">',
+    r'<div\s+class="midcol\s+unvoted">'
+    r'.*?</div>\s*</div>\s*'
+    r'(?:<(?:a|div)[^>]*>.*?</(?:a|div)>\s*)*?'
+    r'<div\s+class="entry\s+unvoted">'
+    r'.*?</div>\s*</div>\s*'
+    r'(?:<div\s+class="child">.*?</div>\s*)?'
+    r'<div\s+class="clearleft">',
     re.DOTALL,
 )
 
