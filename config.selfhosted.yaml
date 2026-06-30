@@ -113,6 +113,10 @@ post_processing:
       stage1_extractor: none
       stage2_converter: none
       stage3_clean: true
+    invisible_playwright:
+      stage1_extractor: readability
+      stage2_converter: markdownify
+      stage3_clean: true
 
 circuit_breaker:
   enabled: true
