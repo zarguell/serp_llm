@@ -18,8 +18,12 @@ defaults:
 policies:
   - name: reddit
     match:
-      domain_glob: "*.reddit.com"
+      domain: "*.reddit.com"
     extract_provider: invisible_playwright
+    extract_strategy:
+      priority:
+        - reddit_listing
+        - readability
 
   - name: simple_docs
     match:

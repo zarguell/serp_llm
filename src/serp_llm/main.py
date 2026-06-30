@@ -39,6 +39,7 @@ from serp_llm.post_processing.pipeline import PostProcessingPipeline
 from serp_llm.post_processing.strategies import StrategySelector
 from serp_llm.post_processing.strategies.json_ld import JsonLdStrategy
 from serp_llm.post_processing.strategies.meta_extract import MetaExtractStrategy
+from serp_llm.post_processing.strategies.reddit_listing import RedditListingStrategy
 from serp_llm.providers.base import ProviderError
 from serp_llm.providers.registry import ProviderRegistry
 from serp_llm.proxy import ProxyResolver
@@ -182,6 +183,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     strategy_selector = StrategySelector(config_manager)
     strategy_selector.register("json_ld", JsonLdStrategy())
     strategy_selector.register("meta_extract", MetaExtractStrategy())
+    strategy_selector.register("reddit_listing", RedditListingStrategy())
     app.state.strategy_selector = strategy_selector
 
     # --- Post-processing pipeline ---
