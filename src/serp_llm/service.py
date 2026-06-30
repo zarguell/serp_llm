@@ -469,7 +469,7 @@ class GatewayService:
         decision = await self._maybe_judge_policy_miss(
             decision,
             content_type="extract",
-            url=request.url,
+            url=str(request.url),
             query=None,
         )
 
@@ -497,7 +497,7 @@ class GatewayService:
         dlp_outcome = None
         if self._dlp is not None:
             dlp_outcome = self._dlp.check_outbound(
-                request.url, decision.provider
+                str(request.url), decision.provider
             )
             if dlp_outcome.action == "block":
                 latency_ms = max(1, int((time.perf_counter() - start) * 1000))
@@ -506,7 +506,7 @@ class GatewayService:
                         request_id=request_id,
                         api_key_id=api_key_id,
                         type="extract",
-                        url=request.url,
+                        url=str(request.url),
                         provider_used=decision.provider,
                         latency_ms=latency_ms,
                         status="blocked",
@@ -536,7 +536,7 @@ class GatewayService:
 
         session_data: SessionData | None = None
         if request.session_profile is not None and self._session_manager is not None:
-            domain = urlparse(request.url).hostname or ""
+            domain = urlparse(str(request.url)).hostname or ""
 
             try:
                 session_data = await self._session_manager.resolve(
@@ -552,7 +552,7 @@ class GatewayService:
                         request_id=request_id,
                         api_key_id=api_key_id,
                         type="extract",
-                        url=request.url,
+                        url=str(request.url),
                         provider_used=decision.provider,
                         latency_ms=latency_ms,
                         status="error",
@@ -570,7 +570,7 @@ class GatewayService:
 
         if cache_read:
             key = extract_key(
-                request.url,
+                str(request.url),
                 request.format,
                 request.session_profile,
                 decision.provider,
@@ -593,7 +593,7 @@ class GatewayService:
                         request_id=request_id,
                         api_key_id=api_key_id,
                         type="extract",
-                        url=request.url,
+                        url=str(request.url),
                         provider_used=cached_response.provider_used,
                         latency_ms=latency_ms,
                         status="success",
@@ -627,11 +627,11 @@ class GatewayService:
                 result, provider_used, quality_passed = await self._execute_with_fallback(
                     decision.provider,
                     decision.fallback_chain,
-                    lambda provider, opts: provider.extract(request.url, opts),
+                    lambda provider, opts: provider.extract(str(request.url), opts),
                     options,
                     validator=quality_validator,
                     content_type="extract",
-                    url=request.url,
+                    url=str(request.url),
                     query=None,
                     decision=decision,
                 )
@@ -642,7 +642,7 @@ class GatewayService:
                     request_id=request_id,
                     api_key_id=api_key_id,
                     type="extract",
-                    url=request.url,
+                    url=str(request.url),
                     provider_used=decision.provider,
                     latency_ms=latency_ms,
                     status="error",
@@ -680,7 +680,7 @@ class GatewayService:
                         request_id=request_id,
                         api_key_id=api_key_id,
                         type="extract",
-                        url=request.url,
+                        url=str(request.url),
                         provider_used=provider_used,
                         latency_ms=latency_ms,
                         status="error",
@@ -720,7 +720,7 @@ class GatewayService:
                     request.prompt_injection and request.prompt_injection.skip
                 )
                 exempt = is_exempt(
-                    url=request.url,
+                    url=str(request.url),
                     api_key_id=api_key_id,
                     exempt_domains=pi_config.exemptions.domains,
                     exempt_api_key_ids=pi_config.exemptions.api_key_ids,
@@ -729,7 +729,7 @@ class GatewayService:
 
             pp_result = await self._post_processing.run(
                 content=result.content,
-                url=request.url,
+                url=str(request.url),
                 format=result.format,
                 provider=provider_used,
                 policy_matched=decision.policy_matched,
@@ -773,7 +773,7 @@ class GatewayService:
                     if self._event_logger:
                         self._event_logger.log_event(
                             event="injection_detected",
-                            url=request.url,
+                            url=str(request.url),
                             request_id=request_id,
                             api_key_id=api_key_id,
                             injection_type=inj.injection_type,
@@ -783,7 +783,7 @@ class GatewayService:
                             action_taken="block",
                         )
                     raise InjectionBlockedError(
-                        url=request.url,
+                        url=str(request.url),
                         injection_type=inj.injection_type,
                         layer_triggered=inj.layer_triggered,
                         heuristic_score=inj.heuristic_score,
@@ -794,7 +794,7 @@ class GatewayService:
                 if inj.detected and self._event_logger:
                     self._event_logger.log_event(
                         event="injection_detected",
-                        url=request.url,
+                        url=str(request.url),
                         request_id=request_id,
                         api_key_id=api_key_id,
                         injection_type=inj.injection_type,
@@ -813,7 +813,7 @@ class GatewayService:
                         request_id=request_id,
                         api_key_id=api_key_id,
                         type="extract",
-                        url=request.url,
+                        url=str(request.url),
                         provider_used=provider_used,
                         latency_ms=latency_ms,
                         status="blocked",
@@ -833,7 +833,7 @@ class GatewayService:
                 request_id=request_id,
                 api_key_id=api_key_id,
                 type="extract",
-                url=request.url,
+                url=str(request.url),
                 provider_used=provider_used,
                 latency_ms=latency_ms,
                 status="success",
@@ -882,7 +882,7 @@ class GatewayService:
         response = ExtractResponse(
             content=result.content,
             format=result.format,
-            url=request.url,
+            url=str(request.url),
             provider_used=provider_used,
             request_id=request_id,
             latency_ms=latency_ms,
@@ -899,11 +899,11 @@ class GatewayService:
                 cache_cfg.rules,
                 cache_cfg.default_ttl,
                 provider=provider_used,
-                url=request.url,
+                url=str(request.url),
                 content_type="extract",
             )
             key = extract_key(
-                request.url,
+                str(request.url),
                 request.format,
                 request.session_profile,
                 decision.provider,
@@ -915,7 +915,7 @@ class GatewayService:
                 ttl,
                 content_type="extract",
                 provider=provider_used,
-                url=request.url,
+                url=str(request.url),
             )
 
         return response
