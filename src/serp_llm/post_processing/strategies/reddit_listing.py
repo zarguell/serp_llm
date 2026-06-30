@@ -29,19 +29,33 @@ from serp_llm.post_processing.strategies import StrategyResult
 
 logger = logging.getLogger(__name__)
 
-# Match one post row: score div followed by entry div
-_POST_RE = re.compile(
-    r'<div\s+class="score\s+likes"\s+title="(\d+)"[^>]*>.*?</div>\s*'
-    r'</div>\s*'
-    r'<div\s+class="entry\s+unvoted">.*?'
-    r'<p\s+class="title">'
-    r'<a\s+class="title\s+may-blank[^"]*"\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
-    r'\s*<span\s+class="domain">\(<a[^>]*>([^<]*)</a>\)</span>.*?'
-    r'<p\s+class="tagline[^"]*">.*?'
-    r'submitted\s*(?:<time[^>]*>[^<]*</time>\s*)?'
-    r'by\s*<a[^>]*class="author[^"]*"[^>]*>([^<]+)</a>.*?'
-    r'<a[^>]*class="comments\s+may-blank[^"]*"[^>]*>([^<]*)</a>',
+# Split the page into post-row chunks at each "midcol unvoted" boundary.
+# Each chunk contains the vote arrows + score + entry for one post.
+_CHUNK_RE = re.compile(
+    r'<div\s+class="midcol\s+unvoted">.*?</div>\s*</div>\s*'
+    r'<div\s+class="entry\s+unvoted">.*?</div>\s*</div>'
+    r'\s*<div\s+class="clearleft">',
     re.DOTALL,
+)
+
+# Extract score from a chunk: <div class="score likes" title="N">
+_SCORE_RE = re.compile(r'<div\s+class="score\s+likes"\s+title="(\d+)"', re.DOTALL)
+
+# Extract title, href, domain from a chunk
+_TITLE_RE = re.compile(
+    r'<p\s+class="title">'
+    r'<a\s+class="title\s+may-blank[^"]*"\s+[^>]*href="([^"]+)"[^>]*>'
+    r'(.*?)</a>'
+    r'\s*<span\s+class="domain">\(<a[^>]*>([^<]*)</a>\)</span>',
+    re.DOTALL,
+)
+
+# Extract author and comments from a chunk
+_AUTHOR_RE = re.compile(
+    r'<a[^>]*class="author[^"]*"[^>]*>([^<]+)</a>', re.DOTALL
+)
+_COMMENTS_RE = re.compile(
+    r'<a[^>]*class="[^"]*\bcomments\s+may-blank[^"]*"[^>]*>([^<]*)</a>', re.DOTALL
 )
 
 # Subreddit name
@@ -74,8 +88,8 @@ class RedditListingStrategy:
         (no post rows found), letting the next strategy in the priority
         chain handle it.
         """
-        matches = list(_POST_RE.finditer(html))
-        if not matches:
+        chunks = _CHUNK_RE.findall(html)
+        if not chunks:
             return None
 
         sr_match = _SUBREDDIT_RE.search(html)
@@ -84,17 +98,30 @@ class RedditListingStrategy:
         lines.append(f"## {subreddit}")
         lines.append("")
 
-        for i, m in enumerate(matches):
-            score, href, raw_title, domain, author, comments_text = m.groups()
+        for i, chunk in enumerate(chunks):
+            score_m = _SCORE_RE.search(chunk)
+            title_m = _TITLE_RE.search(chunk)
+            author_m = _AUTHOR_RE.search(chunk)
+            comments_m = _COMMENTS_RE.search(chunk)
+
+            if not (score_m and title_m and author_m):
+                continue
+
+            score = score_m.group(1)
+            href = title_m.group(1)
+            raw_title = title_m.group(2)
+            domain = title_m.group(3)
+            author = author_m.group(1)
+            comments_text = comments_m.group(1) if comments_m else ""
+
             title = _clean_title(raw_title)
             score_int = int(score)
 
-            # Parse comment count from text like "103 comments" or "comment"
             comments_count = 0
-            comments_text = comments_text.strip().lower()
-            if comments_text and comments_text != "comment":
+            comments_text_clean = comments_text.strip().lower()
+            if comments_text_clean and comments_text_clean != "comment":
                 with contextlib.suppress(ValueError, IndexError):
-                    comments_count = int(comments_text.split()[0])
+                    comments_count = int(comments_text_clean.split()[0])
 
             post_url = href if href.startswith("http") else "https://old.reddit.com" + href
 
@@ -111,7 +138,6 @@ class RedditListingStrategy:
             lines.append(f"   {post_url}")
             lines.append("")
 
-        # Next page link
         next_match = _NEXT_RE.search(html)
         if next_match:
             next_url = next_match.group(1).replace("&amp;", "&")
