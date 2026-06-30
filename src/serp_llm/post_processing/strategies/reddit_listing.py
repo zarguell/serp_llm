@@ -78,6 +78,11 @@ class RedditListingStrategy:
         fragility from variable HTML structures (thumbnails, flair labels,
         sticky badges, etc.) between the vote column and the entry div.
         """
+        # Bail out for individual post pages — they have midcol divs too but
+        # should be handled by readability article extraction instead.
+        if "/comments/" in url:
+            return None
+
         # Find all midcol positions — these are the reliable post anchors
         midcols = [m.end() for m in _MIDCOL_RE.finditer(html)]
         if not midcols:
