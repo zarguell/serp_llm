@@ -16,6 +16,11 @@ defaults:
       - crawl4ai
 
 policies:
+  - name: reddit
+    match:
+      domain_glob: "*.reddit.com"
+    extract_provider: invisible_playwright
+
   - name: simple_docs
     match:
       domain_glob:

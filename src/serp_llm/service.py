@@ -64,16 +64,33 @@ from serp_llm.sessions.models import CookieEntry, SessionData
 # bot-solving provider (flaresolverr, invisible_playwright) into the
 # candidate list — no per-domain policy rule needed.
 BOT_BLOCK_PATTERNS: list[str] = [
+    # Cloudflare / DDoS-GUARD
     "Please enable JavaScript",
-    "Access Denied",
     "Just a moment...",
     "Checking your browser",
     "DDoS protection",
     "Cloudflare",
     "_cf_chl_opt",
     "cf-browser-verification",
+    # Generic bot / CAPTCHA detection
+    "verify you're human",
+    "verify you are human",
+    "unusual traffic from your",
+    "security check",
+    # hCaptcha / reCAPTCHA
+    "h-captcha",
+    "hcaptcha",
+    "recaptcha/api",
+    # Rate limiting
+    "too many requests",
+    "please try again later",
+    # Access control
+    "Access Denied",
+    "access denied",
+    # Geetest (Chinese CAPTCHA)
     "geetest",
     "captcha-delivery.com",
+    # DataDome
     "var dd=",
 ]
 
