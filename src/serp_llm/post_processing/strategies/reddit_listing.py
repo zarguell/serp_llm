@@ -4,69 +4,56 @@ Parses old.reddit.com listing HTML (subreddit feeds, search results) into
 structured markdown with post titles, scores, comment counts, authors,
 and URLs.  Individual post pages are handled by the default readability
 extractor and don't reach this strategy.
+
+The parser works on the old.reddit.com desktop HTML structure:
+  <div class="entry unvoted">
+    <div class="top-matter">
+      <p class="title"><a class="title may-blank" href="...">Title</a> ...</p>
+      <p class="tagline">submitted <time ...>...</time> by <a class="author">...</a></p>
+      <ul class="flat-list buttons">
+        <li class="first"><a class="comments may-blank">N comments</a></li>
+      </ul>
+    </div>
+  </div>
+
+Score comes from the preceding <div class="score likes" title="N"> div.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
-from datetime import UTC, datetime
 
 from serp_llm.post_processing.strategies import StrategyResult
 
 logger = logging.getLogger(__name__)
 
-# Regex to extract individual post entries from old.reddit.com listing HTML
-_THING_RE = re.compile(
-    r'<div\s+class="thing[^"]*"\s+id="thing_([^"]+)"[^>]*'
-    r'data-score="(\d+)"[^>]*'
-    r'data-comments-count="(\d+)"[^>]*'
-    r'data-author="([^"]*)"[^>]*'
-    r'data-url="([^"]*)"[^>]*'
-    r'data-rank="(\d+)"[^>]*'
-    r'data-timestamp="(\d+)"[^>]*?>',
+# Match one post row: score div followed by entry div
+_POST_RE = re.compile(
+    r'<div\s+class="score\s+likes"\s+title="(\d+)"[^>]*>.*?</div>\s*'
+    r'</div>\s*'
+    r'<div\s+class="entry\s+unvoted">.*?'
+    r'<p\s+class="title">'
+    r'<a\s+class="title\s+may-blank[^"]*"\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
+    r'\s*<span\s+class="domain">\(<a[^>]*>([^<]*)</a>\)</span>.*?'
+    r'<p\s+class="tagline[^"]*">.*?'
+    r'submitted\s*(?:<time[^>]*>[^<]*</time>\s*)?'
+    r'by\s*<a[^>]*class="author[^"]*"[^>]*>([^<]+)</a>.*?'
+    r'<a[^>]*class="comments\s+may-blank[^"]*"[^>]*>([^<]*)</a>',
     re.DOTALL,
 )
 
-# Extract the post title (the <a> inside <p class="title">)
-_TITLE_RE = re.compile(
-    r'<p\s+class="title">.*?<a[^>]*class="title[^"]*"[^>]*>(.*?)</a>',
-    re.DOTALL,
-)
-
-# Extract domain from <span class="domain">
-_DOMAIN_RE = re.compile(
-    r'<span\s+class="domain">.*?\(<a[^>]*>([^<]+)</a>\).*?</span>',
-    re.DOTALL,
-)
-
-# Extract subreddit name from the page
+# Subreddit name
 _SUBREDDIT_RE = re.compile(
-    r'data-subreddit="([^"]+)"',
-    re.DOTALL,
+    r'data-subreddit-prefixed="([^"]+)"',
 )
 
-# Extract "view more" / next page link
+# Next page link
 _NEXT_RE = re.compile(
-    r'<span\s+class="next-button">.*?<a\s+href="([^"]+)"\s+rel="nofollow\s+next">',
+    r'<span\s+class="next-button">.*?<a\s+href="([^"]+)"',
     re.DOTALL,
 )
-
-
-def _parse_timestamp(ts_ms: str) -> str:
-    """Convert a Unix millisecond timestamp to a relative time string."""
-    try:
-        ts = int(ts_ms) / 1000
-        dt = datetime.fromtimestamp(ts, tz=UTC)
-        now = datetime.now(tz=UTC)
-        delta = now - dt
-        if delta.days > 0:
-            return f"{delta.days}d ago"
-        if delta.seconds >= 3600:
-            return f"{delta.seconds // 3600}h ago"
-        return f"{delta.seconds // 60}m ago"
-    except (ValueError, OSError):
-        return ""
 
 
 def _clean_title(title: str) -> str:
@@ -84,66 +71,43 @@ class RedditListingStrategy:
         """Parse old.reddit.com listing HTML into structured markdown.
 
         Returns ``None`` if the page doesn't look like a Reddit listing
-        (no ``thing`` divs found), letting the next strategy in the
-        priority chain handle it.
+        (no post rows found), letting the next strategy in the priority
+        chain handle it.
         """
-        matches = _THING_RE.findall(html)
+        matches = list(_POST_RE.finditer(html))
         if not matches:
             return None
 
-        # Determine subreddit name
         sr_match = _SUBREDDIT_RE.search(html)
-        subreddit = sr_match.group(1) if sr_match else "reddit"
-
+        subreddit = sr_match.group(1) if sr_match else "r/reddit"
         lines: list[str] = []
-        lines.append(f"## r/{subreddit}")
+        lines.append(f"## {subreddit}")
         lines.append("")
 
-        for match in matches:
-            thing_id, score, comments, author, data_url, rank, timestamp = match
-            rank_num = int(rank)
-
-            # Extract title from within this thing's block
-            # We search for the title in a block scoped to this thing
-            thing_block_match = re.search(
-                rf'<div\s+class="thing[^"]*"\s+id="thing_{re.escape(thing_id)}".*?</div>\s*</div>\s*<div\s+class="clearleft">',
-                html,
-                re.DOTALL,
-            )
-            title = ""
-            domain = ""
-            if thing_block_match:
-                thing_block = thing_block_match.group(0)
-                title_match = _TITLE_RE.search(thing_block)
-                if title_match:
-                    title = _clean_title(title_match.group(1))
-
-                domain_match = _DOMAIN_RE.search(thing_block)
-                if domain_match:
-                    domain = domain_match.group(1).strip()
-
-            if not title:
-                continue
-
+        for i, m in enumerate(matches):
+            score, href, raw_title, domain, author, comments_text = m.groups()
+            title = _clean_title(raw_title)
             score_int = int(score)
-            comments_int = int(comments)
-            time_str = _parse_timestamp(timestamp)
 
-            # Build the post line
-            line = f"{rank_num}. **{title}**"
+            # Parse comment count from text like "103 comments" or "comment"
+            comments_count = 0
+            comments_text = comments_text.strip().lower()
+            if comments_text and comments_text != "comment":
+                with contextlib.suppress(ValueError, IndexError):
+                    comments_count = int(comments_text.split()[0])
+
+            post_url = href if href.startswith("http") else "https://old.reddit.com" + href
+
+            line = f"{i + 1}. **{title}**"
             if domain:
                 line += f" ({domain})"
             lines.append(line)
 
-            details = []
-            details.append(f"Score: {score_int}")
-            details.append(f"Comments: {comments_int}")
+            details = [f"Score: {score_int}"]
+            if comments_count:
+                details.append(f"Comments: {comments_count}")
             details.append(f"by {author}")
-            if time_str:
-                details.append(time_str)
             lines.append(f"   {' | '.join(details)}")
-
-            post_url = data_url.replace("&amp;", "&")
             lines.append(f"   {post_url}")
             lines.append("")
 
