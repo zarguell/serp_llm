@@ -19,6 +19,8 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
+from serp_llm.telemetry import TelemetryConfig
+
 _ENV_VAR_PATTERN = re.compile(r"\$\{(\w+)(?::-(.*?))?\}")
 
 
@@ -478,6 +480,7 @@ class GatewayConfig(BaseModel):
     quotas: QuotasConfig = Field(default_factory=QuotasConfig)
     alerts: AlertConfig = Field(default_factory=AlertConfig)
     rate_limiting: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     max_concurrency: int = Field(
         default=3,
         ge=1,

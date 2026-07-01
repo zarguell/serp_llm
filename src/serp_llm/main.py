@@ -33,6 +33,7 @@ from serp_llm.judge import LLMJudge
 from serp_llm.key_store import KeyStore
 from serp_llm.mcp.server import mount_mcp
 from serp_llm.middleware.security_headers import SecurityHeadersMiddleware
+from serp_llm.middleware.telemetry import TelemetryMiddleware
 from serp_llm.policy.engine import PolicyEngine
 from serp_llm.post_processing.dedup import DedupStore
 from serp_llm.post_processing.pipeline import PostProcessingPipeline
@@ -103,6 +104,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config_path = os.environ.get("CONFIG_PATH", "config.yaml")
     config_manager = ConfigManager(config_path)
     app.state.config_manager = config_manager
+    app.state.telemetry_config = config_manager.config.telemetry
     _check_known_default_secrets(config_manager)
 
     # --- Rate limiting ---
@@ -277,8 +279,11 @@ def create_app() -> FastAPI:
     app.include_router(keys_router)
     app.include_router(admin_ui_router)
 
+    # TelemetryMiddleware must be added before RateLimitMiddleware so rate
+    # limiting uses the real client IP, not the reverse-proxy address.
     # Rate limiting middleware must be added before SecurityHeadersMiddleware
     # so rate-limit 429 responses get the security headers too.
+    app.add_middleware(TelemetryMiddleware)
     app.add_middleware(RateLimitMiddleware, fastapi_app=app)
     app.add_middleware(SecurityHeadersMiddleware)
 
