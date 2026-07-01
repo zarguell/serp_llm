@@ -171,6 +171,7 @@ async def execute_web_search(
                 query=query, num_results=num_results, provider=provider_hint
             ),
             api_key_id=api_key_id,
+            interface="mcp",
         )
         return result.model_dump_json()
     except (DlpBlockedError, ProviderError) as exc:
@@ -195,6 +196,7 @@ async def execute_web_extract(
                 url=url, format=format, provider=provider_hint
             ),
             api_key_id=api_key_id,
+            interface="mcp",
         )
         return result.model_dump_json()
     except (DlpBlockedError, ProviderError) as exc:
