@@ -7,6 +7,7 @@ the header when the direct connection came from a known proxy CIDR.
 
 from __future__ import annotations
 
+import functools
 import ipaddress
 from typing import Any
 
@@ -33,6 +34,18 @@ class TelemetryConfig(BaseModel):
             "header is trusted and its *leftmost* IP is used as the client source."
         ),
     )
+
+
+@functools.lru_cache(maxsize=32)
+def _parse_trusted_nets(trusted_cidrs_tuple: tuple[str, ...]) -> tuple:
+    """Parse CIDR strings to network objects, skipping invalid entries."""
+    nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for cidr in trusted_cidrs_tuple:
+        try:
+            nets.append(ipaddress.ip_network(cidr, strict=False))
+        except ValueError:
+            continue
+    return tuple(nets)
 
 
 def resolve_client_ip(
@@ -79,8 +92,8 @@ def resolve_client_ip(
     except ValueError:
         return client_host  # unparseable — don't trust XFF
 
-    trusted_nets = [ipaddress.ip_network(cidr) for cidr in trusted_cidrs]
-    if not any(client_addr in net for net in trusted_nets):
+    trusted_nets = _parse_trusted_nets(tuple(trusted_cidrs))
+    if not trusted_nets or not any(client_addr in net for net in trusted_nets):
         return client_host  # not from a trusted proxy
 
     # Request came from a trusted proxy — parse X-Forwarded-For
