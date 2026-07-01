@@ -38,6 +38,13 @@ async def search(
 ) -> SearchResponse | DryRunResponse:
     """Search the web. Provider selected automatically by policy engine."""
     service: GatewayService = request.app.state.gateway_service
-    result = await service.search(body, api_key_id=key.id, dry_run=dry_run)
+    source_ip: str = getattr(request.state, "client_ip", "") or ""
+    result = await service.search(
+        body,
+        api_key_id=key.id,
+        source_ip=source_ip,
+        interface="rest",
+        dry_run=dry_run,
+    )
     response.headers["X-Request-ID"] = result.request_id
     return result
