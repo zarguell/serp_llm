@@ -131,6 +131,42 @@ async def scrape(req: ScrapeRequest):
                         "Selector %r not found within timeout", req.wait_for_selector
                     )
 
+            # Dismiss cookie/consent banners before content extraction.
+            # Scoped to consent-specific containers to avoid clicking page-level
+            # "Accept" buttons (e.g., "Accept invitation").  Runs before content
+            # expansion so the banner doesn't overlay "show more" targets.
+            try:
+                for selector in (
+                    # Common CMP SDK selectors
+                    ".cky-btn-accept",
+                    "#onetrust-accept-btn-handler",
+                    "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
+                    ".cc-btn.cc-dismiss",
+                    "#accept-choices",
+                    ".js-cookie-consent-agree",
+                    # Generic consent container buttons
+                    '[class*="cookie"] button',
+                    '[class*="consent"] button',
+                    '[id*="cookie"] button',
+                    '[id*="consent"] button',
+                    # Text-match as last resort (higher false-positive risk)
+                    'button:has-text("Accept all")',
+                    'button:has-text("Accept cookies")',
+                    'button:has-text("I agree")',
+                    'button:has-text("Got it")',
+                ):
+                    buttons = await page.query_selector_all(selector)
+                    for btn in buttons:
+                        try:
+                            await btn.click()
+                            await page.wait_for_timeout(500)
+                        except Exception:
+                            pass
+                # Brief settle after consent — some CMPs trigger page re-renders.
+                await page.wait_for_load_state("networkidle")
+            except Exception:
+                logger.debug("Consent dismissal skipped", exc_info=True)
+
             # Expand collapsed content: scroll to trigger lazy loading, then
             # uncover hidden sections by clicking "show more" buttons and removing
             # CSS constraints on common collapsed containers.  This runs before
