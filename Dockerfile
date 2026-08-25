@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -42,7 +42,7 @@ RUN pip uninstall -y --no-cache-dir pip setuptools 2>/dev/null || true \
 
 # ----------
 # MkDocs builder stage
-FROM python:3.12-slim AS docs-builder
+FROM python:3.14-slim AS docs-builder
 
 WORKDIR /app
 COPY docs-src/mkdocs.yml ./docs-src/mkdocs.yml
@@ -61,7 +61,7 @@ RUN python scripts/generate_provider_pages.py docs-src/docs/providers/policies
 RUN mkdocs build --config-file docs-src/mkdocs.yml --site-dir /app/static/docs
 
 # ----------
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \

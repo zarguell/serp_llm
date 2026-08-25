@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.source="https://github.com/feder-cr/invisible_playwright"
 LABEL description="REST API sidecar for invisible_playwright stealth Firefox"
