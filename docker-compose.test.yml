@@ -125,7 +125,7 @@ services:
     restart: "no"
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     profiles: ["firecrawl-selfhosted"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]

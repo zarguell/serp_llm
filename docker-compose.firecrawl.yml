@@ -60,7 +60,7 @@ services:
     restart: "no"
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
       interval: 5s
