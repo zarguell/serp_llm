@@ -53,7 +53,7 @@ services:
 
   # --- Crawl4AI self-hosted crawler ---
   crawl4ai:
-    image: unclecode/crawl4ai:0.8.6
+    image: unclecode/crawl4ai:0.9.3
     profiles: ["crawl4ai"]
     ports:
       - "11235:11235"

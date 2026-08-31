@@ -31,7 +31,7 @@ services:
 
   # --- Crawl4AI self-hosted crawler (JS rendering + markdown) ---
   crawl4ai:
-    image: unclecode/crawl4ai:0.8.6
+    image: unclecode/crawl4ai:0.9.3
     ports:
       - "11235:11235"
     shm_size: "1gb"
