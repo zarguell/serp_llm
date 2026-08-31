@@ -78,7 +78,7 @@ services:
       start_period: 10s
 
   crawl4ai:
-    image: unclecode/crawl4ai:0.8.6
+    image: unclecode/crawl4ai:0.9.3
     container_name: serpllm-crawl4ai
     restart: unless-stopped
     shm_size: "1gb"
