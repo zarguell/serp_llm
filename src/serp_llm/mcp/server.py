@@ -207,11 +207,11 @@ async def execute_web_extract(
 # Server factory
 # ---------------------------------------------------------------------------
 
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.mcpserver import MCPServer  # noqa: E402
 
 
-def create_mcp_server(gateway_service: GatewayService) -> FastMCP:
-    """Build a FastMCP server with web_search and web_extract tools.
+def create_mcp_server(gateway_service: GatewayService) -> MCPServer:
+    """Build an MCPServer with web_search and web_extract tools.
 
     The returned instance is ready for ``streamable_http_app()`` and
     ``session_manager.run()``. Transport settings are configured for
@@ -222,14 +222,9 @@ def create_mcp_server(gateway_service: GatewayService) -> FastMCP:
             All tool calls delegate to this instance.
 
     Returns:
-        A configured :class:`FastMCP` instance.
+        A configured :class:`MCPServer` instance.
     """
-    mcp = FastMCP(
-        "serpLLM",
-        json_response=True,
-        stateless_http=True,
-        streamable_http_path="/",
-    )
+    mcp = MCPServer("serpLLM")
 
     @mcp.tool()
     async def web_search(
@@ -330,7 +325,11 @@ def mount_mcp(
         )
 
     mcp_server = create_mcp_server(gateway_service)
-    mcp_app = mcp_server.streamable_http_app()
+    mcp_app = mcp_server.streamable_http_app(
+        json_response=True,
+        stateless_http=True,
+        streamable_http_path="/",
+    )
     key_store: KeyStore | None = getattr(app.state, "key_store", None)
     mcp_app.add_middleware(
         McpAuthMiddleware,
